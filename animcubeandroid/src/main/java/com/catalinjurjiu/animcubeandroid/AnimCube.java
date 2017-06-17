@@ -1324,7 +1324,7 @@ public final class AnimCube extends SurfaceView implements Runnable,
 
                                 canvas.drawPath(path, paint);
                                 paint.setStyle(Paint.Style.STROKE);
-                                paint.setColor(colors[cube[i][p * 3 + q]].darker().colorCode);
+                                paint.setColor(colors[cube[i][p * 3 + q]].darker());
                                 canvas.drawPath(path, paint);
                             }
                         }
@@ -1421,7 +1421,7 @@ public final class AnimCube extends SurfaceView implements Runnable,
                                 getCorners(i, j, fillX, fillY, q
                                         + CubeConstants.border[j][0], p
                                         + CubeConstants.border[j][1], mirrored);
-                            paint.setColor(colors[cube[i][p * 3 + q]].darker().colorCode);
+                            paint.setColor(colors[cube[i][p * 3 + q]].darker());
 
                             path.reset();
                             path.moveTo(fillX[0], fillY[0]);

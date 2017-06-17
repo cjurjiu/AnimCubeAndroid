@@ -2,6 +2,8 @@
 <resources>
     <declare-styleable name="AnimCube">
         <attr name="backgroundColor" format="color|reference"/>
+        <attr name="cubeColors" format="string|reference"/>
+        <attr name="moves" format="string|reference"/>
         <attr name="editable" format="boolean|reference"/>
         <attr name="backFacesDistance" format="integer|reference"/>
         <attr name="touchSensitivity" format="float|reference"/>
