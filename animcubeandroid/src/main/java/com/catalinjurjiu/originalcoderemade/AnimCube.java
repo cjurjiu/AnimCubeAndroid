@@ -1,17 +1,25 @@
 package com.catalinjurjiu.originalcoderemade;
 
 import android.content.Context;
+import android.content.res.TypedArray;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Process;
 import android.util.AttributeSet;
+import android.util.Log;
+import android.view.MotionEvent;
+import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.View;
 
 import com.catalinjurjiu.animcubeandroid.Color;
+import com.catalinjurjiu.animcubeandroid.CubeConstants;
+import com.catalinjurjiu.animcubeandroid.CubeUtils;
+import com.catalinjurjiu.animcubeandroid.R;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.Hashtable;
 
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.adjacentFaces;
@@ -30,46 +38,37 @@ import static com.catalinjurjiu.animcubeandroid.CubeConstants.faceCorners;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.faceNormals;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.faceTwistDirs;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.factors;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.metricChar;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.midBlockFaceDim;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.midBlockTable;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.modeChar;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.modifierStrings;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.moveCodes;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.moveModes;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.oppositeCorners;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.posFaceTransform;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.posFaceletTransform;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.rotCos;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.rotSign;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.rotSin;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.rotVec;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.topBlockFaceDim;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.topBlockTable;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.turnSymbol;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.twistDirs;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.arrayMovePos;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.colors;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.realMoveLength;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.vAdd;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.vCopy;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.vMul;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.vNorm;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.vProd;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.vScale;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.vSub;
 
 /**
  * @author Josef Jelinek
  * @version 3.5b
  */
 
-public final class AnimCube extends SurfaceView implements Runnable {
-    // status bar help strings
-    private static final String[] buttonDescriptions = {
-            "Clear to the initial state",
-            "Show the previous step",
-            "Play backward",
-            "Stop",
-            "Play",
-            "Show the next step",
-            "Go to the end",
-            "Next sequence"
-    };
+public final class AnimCube extends SurfaceView implements View.OnTouchListener {
+    private static final int NEXT_MOVE = 0;
+    private static final String TAG = "AnimCube";
     // external configuration
     private final Hashtable config = new Hashtable();
-    // cube colors
-    private final Color[] colors = new Color[24];
     // cube facelets
     private final int[][] cube = new int[6][9];
     private final int[][] initialCube = new int[6][9];
@@ -107,10 +106,7 @@ public final class AnimCube extends SurfaceView implements Runnable {
     private final double[][] eyeArray = new double[3][];
     private final double[][] eyeArrayX = new double[3][];
     private final double[][] eyeArrayY = new double[3][];
-    private final int[][] eyeOrder = {{1, 0, 0}, {0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {1, 0, 1}, {1, 0, 2}};
     private final int[][][][] blockArray = new int[3][][][];
-    private final int[][] blockMode = {{0, 2, 2}, {2, 1, 2}, {2, 2, 2}, {2, 2, 2}, {2, 2, 2}, {2, 2, 2}};
-    private final int[][] drawOrder = {{0, 1, 2}, {2, 1, 0}, {0, 2, 1}};
     // polygon co-ordinates to fill (cube faces or facelets)
     private final int[] fillX = new int[4];
     private final int[] fillY = new int[4];
@@ -123,12 +119,10 @@ public final class AnimCube extends SurfaceView implements Runnable {
     private final double[] faceShiftY = new double[6];
     private final double[] tempNormal = new double[3];
     private final double[] eyeD = new double[3];
+    private final Path path = new Path();
     // background colors
-    private Color bgColor;
+    private Color backgroundColor;
     private Color bgColor2;
-    private Color hlColor;
-    private Color textColor;
-    private Color buttonBgColor;
     // current twisted layer
     private int twistedLayer;
     private int twistedMode;
@@ -150,36 +144,23 @@ public final class AnimCube extends SurfaceView implements Runnable {
     private boolean animating; // animation run
     private boolean dragging; // progress bar is controlled
     private boolean demo; // demo mode
-    private int persp; // perspective deformation
+    private int perspective; // perspective deformation
     private double scale; // cube scale
     private int align; // cube alignment (top, center, bottom)
-    private boolean hint;
+    private boolean showBackFaces;
     private double faceShift;
     // move sequence data
     private int[][] move;
     private int[][] demoMove;
-    private int curMove;
     private int movePos;
     private int moveDir;
     private boolean moveOne;
     private boolean moveAnimated;
     private int metric;
-    private String[] infoText;
-    private int curInfoText;
     // state of buttons
-    private int buttonBar; // button bar mode
-    private int buttonHeight;
-    private boolean drawButtons = true;
     private boolean pushed;
-    private int buttonPressed = -1;
     private int progressHeight = 6;
-    private int textHeight;
-    private int moveText;
-    private boolean outlined = true;
-    private Thread animThread = null; // thread to perform the animation
     // double buffered animation
-    private Graphics graphics = null;
-    private Image image = null;
     // cube window size (applet window is resizable)
     private int width;
     private int height;
@@ -196,702 +177,116 @@ public final class AnimCube extends SurfaceView implements Runnable {
     // current drag directions
     private double dragX;
     private double dragY;
-    private String buttonDescription = "";
+    private HandlerThread renderThread;
+    private Thread animThread; // thread to perform the animation
+    private Handler renderHandler;
+    /**
+     * CATA ADDED FIELDS
+     **/
+    private Runnable renderingRunnable;
+    private OnTouchListener onTouchListener;
+    private SurfaceHolder surfaceHolder;
+    private boolean surfaceCreated;
+    private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Runnable paintRunnable = new Runnable() {
+        @Override
+        public void run() {
+            synchronized (renderThread) {
+                if (surfaceCreated) {
+                    paint();
+                }
+            }
+        }
+    };
+    private Runnable animRunnable = new Runnable() {
+        @Override
+        public void run() {
+            animateCube();
+        }
+    };
+    private SurfaceHolder.Callback surfaceCallback = new SurfaceHolder.Callback() {
+        @Override
+        public void surfaceCreated(SurfaceHolder holder) {
+            synchronized (renderThread) {
+                surfaceCreated = true;
+            }
+        }
+
+        @Override
+        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            repaint();
+        }
+
+        @Override
+        public void surfaceDestroyed(SurfaceHolder holder) {
+            synchronized (renderThread) {
+                surfaceCreated = false;
+                renderHandler.removeCallbacks(renderingRunnable);
+            }
+        }
+    };
+    private float touchSensitivityCoefficient;
+    private boolean mActionDownReceived;
+    private String initialColorValues;
 
     public AnimCube(Context context) {
         super(context);
+        init(context, null, -1, -1);
     }
 
     public AnimCube(Context context, AttributeSet attrs) {
         super(context, attrs);
+        init(context, attrs, -1, -1);
     }
 
     public AnimCube(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        init(context, attrs, defStyleAttr, -1);
     }
 
-
-    private static int realMoveLength(int[] move) {
-        int length = 0;
-        for (int i = 0; i < move.length; i++)
-            if (move[i] < 1000)
-                length++;
-        return length;
+    @SuppressWarnings("NewApi")
+    public AnimCube(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+        super(context, attrs, defStyleAttr, defStyleRes);
+        init(context, attrs, defStyleAttr, defStyleRes);
     }
 
-    private static int realMovePos(int[] move, int pos) {
-        int rpos = 0;
-        for (int i = 0; i < pos; i++)
-            if (move[i] < 1000)
-                rpos++;
-        return rpos;
-    }
-
-    private static int arrayMovePos(int[] move, int realPos) {
-        int pos = 0;
-        int rpos = 0;
-        while (true) {
-            while (pos < move.length && move[pos] >= 1000)
-                pos++;
-            if (rpos == realPos)
-                break;
-            if (pos < move.length) {
-                rpos++;
-                pos++;
-            }
-        }
-        return pos;
-    }
-
-    private static void drawArrow(Graphics g, int x, int y, int dir) {
-        g.setColor(Color.black);
-        g.drawLine(x, y - 3, x, y + 3);
-        x += dir;
-        for (int i = 0; i >= -3 && i <= 3; i += dir) {
-            int j = 3 - i * dir;
-            g.drawLine(x + i, y + j, x + i, y - j);
-        }
-        g.setColor(Color.white);
-        for (int i = 0; i >= -1 && i <= 1; i += dir) {
-            int j = 1 - i * dir;
-            g.drawLine(x + i, y + j, x + i, y - j);
-        }
-    }
-
-    private static void drawRect(Graphics g, int x, int y, int width, int height) {
-        g.setColor(Color.black);
-        g.drawRect(x, y, width - 1, height - 1);
-        g.setColor(Color.white);
-        g.fillRect(x + 1, y + 1, width - 2, height - 2);
-    }
-
-    private static double[] vCopy(double[] vector, double[] srcVec) {
-        vector[0] = srcVec[0];
-        vector[1] = srcVec[1];
-        vector[2] = srcVec[2];
-        return vector;
-    }
-
-    private static double[] vNorm(double[] vector) {
-        double length = Math.sqrt(vProd(vector, vector));
-        vector[0] /= length;
-        vector[1] /= length;
-        vector[2] /= length;
-        return vector;
-    }
-
-    private static double[] vScale(double[] vector, double value) {
-        vector[0] *= value;
-        vector[1] *= value;
-        vector[2] *= value;
-        return vector;
-    }
-
-    private static double vProd(double[] vec1, double[] vec2) {
-        return vec1[0] * vec2[0] + vec1[1] * vec2[1] + vec1[2] * vec2[2];
-    }
-
-    private static double[] vAdd(double[] vector, double[] srcVec) {
-        vector[0] += srcVec[0];
-        vector[1] += srcVec[1];
-        vector[2] += srcVec[2];
-        return vector;
-    }
-
-    private static double[] vSub(double[] vector, double[] srcVec) {
-        vector[0] -= srcVec[0];
-        vector[1] -= srcVec[1];
-        vector[2] -= srcVec[2];
-        return vector;
-    }
-
-    private static double[] vMul(double[] vector, double[] vec1, double[] vec2) {
-        vector[0] = vec1[1] * vec2[2] - vec1[2] * vec2[1];
-        vector[1] = vec1[2] * vec2[0] - vec1[0] * vec2[2];
-        vector[2] = vec1[0] * vec2[1] - vec1[1] * vec2[0];
-        return vector;
-    }
-
-    private static double[] vRotX(double[] vector, double angle) {
-        double sinA = Math.sin(angle);
-        double cosA = Math.cos(angle);
-        double y = vector[1] * cosA - vector[2] * sinA;
-        double z = vector[1] * sinA + vector[2] * cosA;
-        vector[1] = y;
-        vector[2] = z;
-        return vector;
-    }
-
-    private static double[] vRotY(double[] vector, double angle) {
-        double sinA = Math.sin(angle);
-        double cosA = Math.cos(angle);
-        double x = vector[0] * cosA - vector[2] * sinA;
-        double z = vector[0] * sinA + vector[2] * cosA;
-        vector[0] = x;
-        vector[2] = z;
-        return vector;
-    }
-
-    private static double[] vRotZ(double[] vector, double angle) {
-        double sinA = Math.sin(angle);
-        double cosA = Math.cos(angle);
-        double x = vector[0] * cosA - vector[1] * sinA;
-        double y = vector[0] * sinA + vector[1] * cosA;
-        vector[0] = x;
-        vector[1] = y;
-        return vector;
-    }
-
-    public void init() {
-        // register to receive all mouse events
-        addMouseListener(this);
-        addMouseMotionListener(this);
-        // setup colors
-        colors[0] = new Color(255, 128, 64);   // 0 - light orange
-        colors[1] = new Color(255, 0, 0);      // 1 - pure red
-        colors[2] = new Color(0, 255, 0);      // 2 - pure green
-        colors[3] = new Color(0, 0, 255);      // 3 - pure blue
-        colors[4] = new Color(153, 153, 153);  // 4 - white grey
-        colors[5] = new Color(170, 170, 68);   // 5 - yellow grey
-        colors[6] = new Color(187, 119, 68);   // 6 - orange grey
-        colors[7] = new Color(153, 68, 68);    // 7 - red grey
-        colors[8] = new Color(68, 119, 68);    // 8 - green grey
-        colors[9] = new Color(0, 68, 119);     // 9 - blue grey
-        colors[10] = new Color(255, 255, 255); // W - white
-        colors[11] = new Color(255, 255, 0);   // Y - yellow
-        colors[12] = new Color(255, 96, 32);   // O - orange
-        colors[13] = new Color(208, 0, 0);     // R - red
-        colors[14] = new Color(0, 144, 0);     // G - green
-        colors[15] = new Color(32, 64, 208);   // B - blue
-        colors[16] = new Color(176, 176, 176); // L - light gray
-        colors[17] = new Color(80, 80, 80);    // D - dark gray
-        colors[18] = new Color(255, 0, 255);   // M - magenta
-        colors[19] = new Color(0, 255, 255);   // C - cyan
-        colors[20] = new Color(255, 160, 192); // P - pink
-        colors[21] = new Color(32, 255, 16);   // N - light green
-        colors[22] = new Color(0, 0, 0);       // K - black
-        colors[23] = new Color(128, 128, 128); // . - gray
-        // create animation thread
-        animThread = new Thread(this, "Cube Animator");
-        animThread.start();
-        // setup default configuration
-        String param = getParameter("config");
-        if (param != null) {
-            try {
-                URL url = new URL(getDocumentBase(), param);
-                InputStream input = url.openStream();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-                String line = reader.readLine();
-                while (line != null) {
-                    int pos = line.indexOf('=');
-                    if (pos > 0) {
-                        String key = line.substring(0, pos).trim();
-                        String value = line.substring(pos + 1).trim();
-                        config.put(key, value);
-                    }
-                    line = reader.readLine();
-                }
-                reader.close();
-            } catch (MalformedURLException ex) {
-                System.err.println("Malformed URL: " + param + ": " + ex);
-            } catch (IOException ex) {
-                System.err.println("Input error: " + param + ": " + ex);
-            }
-        }
-        // setup window background color
-        param = getParameter("bgcolor");
-        if (param != null && param.length() == 6) {
-            for (int i = 0; i < 6; i++) {
-                for (int j = 0; j < 16; j++) {
-                    if (Character.toLowerCase(param.charAt(i)) == "0123456789abcdef".charAt(j)) {
-                        hex[i] = j;
-                        break;
-                    }
-                }
-            }
-            bgColor = new Color(hex[0] * 16 + hex[1], hex[2] * 16 + hex[3], hex[4] * 16 + hex[5]);
-        } else
-            bgColor = Color.gray;
-        // setup button bar background color
-        param = getParameter("butbgcolor");
-        if (param != null && param.length() == 6) {
-            for (int i = 0; i < 6; i++) {
-                for (int j = 0; j < 16; j++) {
-                    if (Character.toLowerCase(param.charAt(i)) == "0123456789abcdef".charAt(j)) {
-                        hex[i] = j;
-                        break;
-                    }
-                }
-            }
-            buttonBgColor = new Color(hex[0] * 16 + hex[1], hex[2] * 16 + hex[3], hex[4] * 16 + hex[5]);
-        } else
-            buttonBgColor = bgColor;
-        // custom colors
-        param = getParameter("colors");
-        if (param != null) {
-            for (int k = 0; k < 10 && k < param.length() / 6; k++) {
-                for (int i = 0; i < 6; i++) {
-                    for (int j = 0; j < 16; j++) {
-                        if (Character.toLowerCase(param.charAt(k * 6 + i)) == "0123456789abcdef".charAt(j)) {
-                            hex[i] = j;
-                            break;
-                        }
-                    }
-                }
-                colors[k] = new Color(hex[0] * 16 + hex[1], hex[2] * 16 + hex[3], hex[4] * 16 + hex[5]);
-            }
-        }
-        // clean the cube
-        for (int i = 0; i < 6; i++)
-            for (int j = 0; j < 9; j++)
-                cube[i][j] = i + 10;
-        String initialPosition = "lluu";
-        // setup color configuration of the solved cube
-        param = getParameter("colorscheme");
-        if (param != null && param.length() == 6) {
-            for (int i = 0; i < 6; i++) { // udfblr
-                int color = 23;
-                for (int j = 0; j < 23; j++) {
-                    if (Character.toLowerCase(param.charAt(i)) == "0123456789wyorgbldmcpnk".charAt(j)) {
-                        color = j;
-                        break;
-                    }
-                }
-                for (int j = 0; j < 9; j++)
-                    cube[i][j] = color;
-            }
-        }
-        // setup facelets - compatible with Lars's applet
-        param = getParameter("pos");
-        if (param != null && param.length() == 54) {
-            initialPosition = "uuuuff";
-            if (bgColor == Color.gray)
-                bgColor = Color.white;
-            for (int i = 0; i < 6; i++) {
-                int ti = posFaceTransform[i];
-                for (int j = 0; j < 9; j++) {
-                    int tj = posFaceletTransform[i][j];
-                    cube[ti][tj] = 23;
-                    for (int k = 0; k < 14; k++) {
-                        // "abcdefgh" ~ "gbrwoyld"
-                        if (param.charAt(i * 9 + j) == "DFECABdfecabgh".charAt(k)) {
-                            cube[ti][tj] = k + 4;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+    public void setCubeColors(String colorValues) {
+        this.initialColorValues = colorValues;
         // setup color facelets
-        param = getParameter("facelets");
-        if (param != null && param.length() == 54) {
-            for (int i = 0; i < 6; i++) {
-                for (int j = 0; j < 9; j++) {
-                    cube[i][j] = 23;
-                    for (int k = 0; k < 23; k++) {
-                        if (Character.toLowerCase(param.charAt(i * 9 + j)) == "0123456789wyorgbldmcpnk".charAt(k)) {
-                            cube[i][j] = k;
-                            break;
-                        }
+        if (colorValues.length() != 54) {
+            return;
+        }
+
+        for (int i = 0; i < 6; i++) {
+            for (int j = 0; j < 9; j++) {
+                cube[i][j] = 23;
+                for (int k = 0; k < 23; k++) {
+                    if (Character.toLowerCase(colorValues.charAt(i * 9 + j)) == "0123456789wyorgbldmcpnk"
+                            .charAt(k)) {
+                        cube[i][j] = k;
+                        break;
                     }
                 }
             }
         }
-        // setup move sequence (and info texts)
-        param = getParameter("move");
-        move = (param == null ? new int[0][0] : getMove(param, true));
+    }
+
+    public void setMoveSequence(String moveSequence) {
+        move = getMove(moveSequence, false);
+    }
+
+    public void resetToInitialState() {
+        stopAnimation();
         movePos = 0;
-        curInfoText = -1;
-        // setup initial move sequence
-        param = getParameter("initmove");
-        if (param != null) {
-            int[][] initialMove = param.equals("#") ? move : getMove(param, false);
-            if (initialMove.length > 0)
-                doMove(cube, initialMove[0], 0, initialMove[0].length, false);
-        }
-        // setup initial reversed move sequence
-        param = getParameter("initrevmove");
-        if (param != null) {
-            int[][] initialReversedMove = param.equals("#") ? move : getMove(param, false);
-            if (initialReversedMove.length > 0)
-                doMove(cube, initialReversedMove[0], 0, initialReversedMove[0].length, true);
-        }
-        // setup initial reversed move sequence
-        param = getParameter("demo");
-        if (param != null) {
-            demoMove = param.equals("#") ? move : getMove(param, true);
-            if (demoMove.length > 0 && demoMove[0].length > 0)
-                demo = true;
-        }
-        // setup initial cube position
-        param = getParameter("position");
-        vNorm(vMul(eyeY, eye, eyeX));
-        if (param == null)
-            param = initialPosition;
-        double pi12 = Math.PI / 12;
-        for (int i = 0; i < param.length(); i++) {
-            double angle = pi12;
-            switch (Character.toLowerCase(param.charAt(i))) {
-                case 'd':
-                    angle = -angle;
-                case 'u':
-                    vRotY(eye, angle);
-                    vRotY(eyeX, angle);
-                    break;
-                case 'f':
-                    angle = -angle;
-                case 'b':
-                    vRotZ(eye, angle);
-                    vRotZ(eyeX, angle);
-                    break;
-                case 'l':
-                    angle = -angle;
-                case 'r':
-                    vRotX(eye, angle);
-                    vRotX(eyeX, angle);
-                    break;
-            }
-        }
-        vNorm(vMul(eyeY, eye, eyeX)); // fix eyeY
-        // setup quarter-turn speed and double-turn speed
-        speed = 0;
-        doubleSpeed = 0;
-        param = getParameter("speed");
-        if (param != null)
-            for (int i = 0; i < param.length(); i++)
-                if (param.charAt(i) >= '0' && param.charAt(i) <= '9')
-                    speed = speed * 10 + (int) param.charAt(i) - '0';
-        param = getParameter("doublespeed");
-        if (param != null)
-            for (int i = 0; i < param.length(); i++)
-                if (param.charAt(i) >= '0' && param.charAt(i) <= '9')
-                    doubleSpeed = doubleSpeed * 10 + (int) param.charAt(i) - '0';
-        if (speed == 0)
-            speed = 10;
-        if (doubleSpeed == 0)
-            doubleSpeed = speed * 3 / 2;
-        // perspective deformation
-        persp = 0;
-        param = getParameter("perspective");
-        if (param == null)
-            persp = 2;
-        else
-            for (int i = 0; i < param.length(); i++)
-                if (param.charAt(i) >= '0' && param.charAt(i) <= '9')
-                    persp = persp * 10 + (int) param.charAt(i) - '0';
-        // cube scale
-        int intscale = 0;
-        param = getParameter("scale");
-        if (param != null)
-            for (int i = 0; i < param.length(); i++)
-                if (param.charAt(i) >= '0' && param.charAt(i) <= '9')
-                    intscale = intscale * 10 + (int) param.charAt(i) - '0';
-        scale = 1.0 / (1.0 + intscale / 10.0);
-        // hint displaying
-        hint = false;
-        param = getParameter("hint");
-        if (param != null) {
-            hint = true;
-            faceShift = 0.0;
-            for (int i = 0; i < param.length(); i++)
-                if (param.charAt(i) >= '0' && param.charAt(i) <= '9')
-                    faceShift = faceShift * 10 + (int) param.charAt(i) - '0';
-            if (faceShift < 1.0)
-                hint = false;
-            else
-                faceShift /= 10.0;
-        }
-        // appearance and configuration of the button bar
-        buttonBar = 1;
-        buttonHeight = 13;
-        progressHeight = move.length == 0 ? 0 : 6;
-        param = getParameter("buttonbar");
-        if ("0".equals(param)) {
-            buttonBar = 0;
-            buttonHeight = 0;
-            progressHeight = 0;
-        } else if ("1".equals(param))
-            buttonBar = 1;
-        else if ("2".equals(param) || move.length == 0) {
-            buttonBar = 2;
-            progressHeight = 0;
-        }
-        // whether the cube can be edited with mouse
-        param = getParameter("edit");
-        if ("0".equals(param))
-            editable = false;
-        else
-            editable = true;
-        // displaying the textual representation of the move
-        param = getParameter("movetext");
-        if ("1".equals(param))
-            moveText = 1;
-        else if ("2".equals(param))
-            moveText = 2;
-        else if ("3".equals(param))
-            moveText = 3;
-        else if ("4".equals(param))
-            moveText = 4;
-        else
-            moveText = 0;
-        // how texts are displayed
-        param = getParameter("fonttype");
-        if (param == null || "1".equals(param))
-            outlined = true;
-        else
-            outlined = false;
-        // metric
-        metric = 0;
-        param = getParameter("metric");
-        if (param != null) {
-            if ("1".equals(param)) // quarter-turn
-                metric = 1;
-            else if ("2".equals(param)) // face-turn
-                metric = 2;
-            else if ("3".equals(param)) // slice-turn
-                metric = 3;
-        }
-        // metric
-        align = 1;
-        param = getParameter("align");
-        if (param != null) {
-            if ("0".equals(param)) // top
-                align = 0;
-            else if ("1".equals(param)) // center
-                align = 1;
-            else if ("2".equals(param)) // bottom
-                align = 2;
-        }
-        // setup initial values
-        for (int i = 0; i < 6; i++)
-            for (int j = 0; j < 9; j++)
-                initialCube[i][j] = cube[i][j];
-        for (int i = 0; i < 3; i++) {
-            initialEye[i] = eye[i];
-            initialEyeX[i] = eyeX[i];
-            initialEyeY[i] = eyeY[i];
-        }
-        // setup colors (contrast)
-        int red = bgColor.getRed();
-        int green = bgColor.getGreen();
-        int blue = bgColor.getBlue();
-        int average = (red * 299 + green * 587 + blue * 114) / 1000;
-        if (average < 128) {
-            textColor = Color.white;
-            hlColor = bgColor.brighter();
-            hlColor = new Color(hlColor.getBlue(), hlColor.getRed(), hlColor.getGreen());
-        } else {
-            textColor = Color.black;
-            hlColor = bgColor.darker();
-            hlColor = new Color(hlColor.getBlue(), hlColor.getRed(), hlColor.getGreen());
-        }
-        bgColor2 = new Color(red / 2, green / 2, blue / 2);
-        curInfoText = -1;
-        if (demo)
-            startAnimation(-1);
-    } // init()
-
-    public String getParameter(String name) {
-        String parameter = super.getParameter(name);
-        if (parameter == null)
-            return (String) config.get(name);
-        return parameter;
+        setCubeColors(initialColorValues);
+        repaint();
     }
 
-    private int[][] getMove(String sequence, boolean info) {
-        if (info) {
-            int inum = 0;
-            int pos = sequence.indexOf('{');
-            while (pos != -1) {
-                inum++;
-                pos = sequence.indexOf('{', pos + 1);
-            }
-            if (infoText == null) {
-                curInfoText = 0;
-                infoText = new String[inum];
-            } else {
-                String[] infoText2 = new String[infoText.length + inum];
-                for (int i = 0; i < infoText.length; i++)
-                    infoText2[i] = infoText[i];
-                curInfoText = infoText.length;
-                infoText = infoText2;
-            }
-        }
-        int num = 1;
-        int pos = sequence.indexOf(';');
-        while (pos != -1) {
-            num++;
-            pos = sequence.indexOf(';', pos + 1);
-        }
-        int[][] move = new int[num][];
-        int lastPos = 0;
-        pos = sequence.indexOf(';');
-        num = 0;
-        while (pos != -1) {
-            move[num++] = getMovePart(sequence.substring(lastPos, pos), info);
-            lastPos = pos + 1;
-            pos = sequence.indexOf(';', lastPos);
-        }
-        move[num] = getMovePart(sequence.substring(lastPos), info);
-        return move;
-    }
-
-    private int[] getMovePart(String sequence, boolean info) {
-        int length = 0;
-        int[] move = new int[sequence.length()]; // overdimmensioned
-        for (int i = 0; i < sequence.length(); i++) {
-            if (sequence.charAt(i) == '.') {
-                move[length] = -1;
-                length++;
-            } else if (sequence.charAt(i) == '{') {
-                i++;
-                String s = "";
-                while (i < sequence.length()) {
-                    if (sequence.charAt(i) == '}')
-                        break;
-                    if (info)
-                        s += sequence.charAt(i);
-                    i++;
-                }
-                if (info) {
-                    infoText[curInfoText] = s;
-                    move[length] = 1000 + curInfoText;
-                    curInfoText++;
-                    length++;
-                }
-            } else {
-                for (int j = 0; j < 21; j++) {
-                    if (sequence.charAt(i) == "UDFBLRESMXYZxyzudfblr".charAt(j)) {
-                        i++;
-                        int mode = moveModes[j];
-                        move[length] = moveCodes[j] * 24;
-                        if (i < sequence.length()) {
-                            if (moveModes[j] == 0) { // modifiers for basic characters UDFBLR
-                                for (int k = 0; k < modeChar.length; k++) {
-                                    if (sequence.charAt(i) == modeChar[k]) {
-                                        mode = k + 1;
-                                        i++;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        move[length] += mode * 4;
-                        if (i < sequence.length()) {
-                            if (sequence.charAt(i) == '1')
-                                i++;
-                            else if (sequence.charAt(i) == '\'' || sequence.charAt(i) == '3') {
-                                move[length] += 2;
-                                i++;
-                            } else if (sequence.charAt(i) == '2') {
-                                i++;
-                                if (i < sequence.length() && sequence.charAt(i) == '\'') {
-                                    move[length] += 3;
-                                    i++;
-                                } else
-                                    move[length] += 1;
-                            }
-                        }
-                        length++;
-                        i--;
-                        break;
-                    }
-                }
-            }
-        }
-        int[] returnMove = new int[length];
-        for (int i = 0; i < length; i++)
-            returnMove[i] = move[i];
-        return returnMove;
-    }
-
-    private String moveText(int[] move, int start, int end) {
-        if (start >= move.length)
-            return "";
-        String s = "";
-        for (int i = start; i < end; i++)
-            s += turnText(move, i);
-        return s;
-    }
-
-    private String turnText(int[] move, int pos) {
-        if (pos >= move.length)
-            return "";
-        if (move[pos] >= 1000)
-            return "";
-        if (move[pos] == -1)
-            return ".";
-        String s = turnSymbol[moveText - 1][move[pos] / 4 % 6][move[pos] / 24];
-        if (s.charAt(0) == '~')
-            return s.substring(1) + modifierStrings[(move[pos] + 2) % 4];
-        return s + modifierStrings[move[pos] % 4];
-    }
-
-    private int moveLength(int[] move, int end) {
-        int length = 0;
-        for (int i = 0; i < move.length && (i < end || end < 0); i++)
-            length += turnLength(move[i]);
-        return length;
-    }
-
-    private int turnLength(int turn) {
-        if (turn < 0 || turn >= 1000)
-            return 0;
-        int modifier = turn % 4;
-        int mode = turn / 4 % 6;
-        int n = 1;
-        switch (metric) {
-            case 1: // quarter-turn metric
-                if (modifier == 1 || modifier == 3)
-                    n *= 2;
-            case 2: // face-turn metric
-                if (mode == 1 || mode == 4 || mode == 5)
-                    n *= 2;
-            case 3: // slice-turn metric
-                if (mode == 3)
-                    n = 0;
-        }
-        return n;
-    }
-
-    private void initInfoText(int[] move) {
-        if (move.length > 0 && move[0] >= 1000)
-            curInfoText = move[0] - 1000;
-        else
-            curInfoText = -1;
-    }
-
-    private void doMove(int[][] cube, int[] move, int start, int length, boolean reversed) {
-        int position = reversed ? start + length : start;
-        while (true) {
-            if (reversed) {
-                if (position <= start)
-                    break;
-                position--;
-            }
-            if (move[position] >= 1000) {
-                curInfoText = reversed ? -1 : move[position] - 1000;
-            } else if (move[position] >= 0) {
-                int modifier = move[position] % 4 + 1;
-                int mode = move[position] / 4 % 6;
-                if (modifier == 4) // reversed double turn
-                    modifier = 2;
-                if (reversed)
-                    modifier = 4 - modifier;
-                twistLayers(cube, move[position] / 24, modifier, mode);
-            }
-            if (!reversed) {
-                position++;
-                if (position >= start + length)
-                    break;
-            }
-        }
-    }
-
-    private void startAnimation(int mode) {
+    public void startAnimation(int mode) {
         synchronized (animThread) {
+
             stopAnimation();
-            if (!demo && (move.length == 0 || move[curMove].length == 0))
+            if (!demo && (move.length == 0 || move[NEXT_MOVE].length == 0))
                 return;
             if (demo && (demoMove.length == 0 || demoMove[0].length == 0))
                 return;
@@ -915,7 +310,7 @@ public final class AnimCube extends SurfaceView implements Runnable {
                     moveAnimated = false;
                     break;
             }
-            //System.err.println("start: notify");
+            Log.e(TAG, "start: notify");
             animThread.notify();
         }
     }
@@ -923,12 +318,12 @@ public final class AnimCube extends SurfaceView implements Runnable {
     public void stopAnimation() {
         synchronized (animThread) {
             restarted = true;
-            //System.err.println("stop: notify");
+            Log.e(TAG, "stop: notify");
             animThread.notify();
             try {
-                //System.err.println("stop: wait");
+                Log.e(TAG, "stop: wait");
                 animThread.wait();
-                //System.err.println("stop: run");
+                Log.e(TAG, "stop: run");
             } catch (InterruptedException e) {
                 interrupted = true;
             }
@@ -936,18 +331,738 @@ public final class AnimCube extends SurfaceView implements Runnable {
         }
     }
 
-    public void run() {
+    @Override
+    public boolean onTouch(View v, MotionEvent event) {
+        if (animating) {
+            return false;
+        }
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                mActionDownReceived = true;
+                handlePointerDownEvent(event);
+                break;
+            case MotionEvent.ACTION_UP:
+                if (mActionDownReceived) {
+                    handlePointerUpEvent();
+                    mActionDownReceived = false;
+                }
+                break;
+            case MotionEvent.ACTION_MOVE:
+                handlePointerDragEvent(event);
+                break;
+        }
+        return true;
+    }
+
+    private void init(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+        TypedArray attributes = context.obtainStyledAttributes(attrs,
+                R.styleable.AnimCube);
+
+        initBackgroundColor(attributes);
+        initEditable(attributes);
+        initInitialRotation(attributes);
+        initBackFacesDistance(attributes);
+        initGestureSensitivity(attributes);
+        initScale(attributes);
+        initPerspective(attributes);
+        initVerticalAlign(attributes);
+        initSingleRotationSpeed(attributes);
+        initDoubleRotationSpeed(attributes);
+        //done, recycle typed array
+        attributes.recycle();
+
+        // get the surface holder of he current surface view, add this view as a
+        // callback
+        surfaceHolder = getHolder();
+        surfaceHolder.addCallback(surfaceCallback);
+        // register to receive all mouse events
+        setOnTouchListener(this);
+
+        // clean the cube
+        for (int i = 0; i < 6; i++) {
+            for (int j = 0; j < 9; j++) {
+                cube[i][j] = i + 10;
+            }
+        }
+
+        // setup move sequence (and info texts)
+        move = new int[0][0];
+        movePos = 0;
+
+        // showBackFaces displaying
+        progressHeight = move.length == 0 ? 0 : 6;
+
+        // setup initial values
+        for (int i = 0; i < 6; i++) {
+            for (int j = 0; j < 9; j++) {
+                initialCube[i][j] = cube[i][j];
+            }
+        }
+        for (int i = 0; i < 3; i++) {
+            initialEye[i] = eye[i];
+            initialEyeX[i] = eyeX[i];
+            initialEyeY[i] = eyeY[i];
+        }
+        // setup colors (contrast)
+        int red = backgroundColor.red;
+        int green = backgroundColor.green;
+        int blue = backgroundColor.blue;
+
+        bgColor2 = new Color(red / 2, green / 2, blue / 2);
+
+        renderThread = new HandlerThread("RenderThread", Process.THREAD_PRIORITY_DISPLAY);
+        renderThread.start();
+        renderHandler = new Handler(renderThread.getLooper());
+
+        // paint first frame
+        repaint();
+        animThread = new Thread(animRunnable);
+        // start animation thread
+        animThread.start();
+    }
+
+    private void initBackgroundColor(TypedArray attributes) {
+        this.backgroundColor = new Color(attributes.getColor(R.styleable.AnimCube_backgroundColor,
+                android.graphics.Color.WHITE));
+    }
+
+    private void initEditable(TypedArray attributes) {
+        this.editable = attributes.getBoolean(R.styleable.AnimCube_editable, false);
+    }
+
+    private void initInitialRotation(TypedArray attributes) {
+        int styleableIndex = R.styleable.AnimCube_initialRotation;
+        String initialRotation = CubeConstants.DEFAULT_INITIAL_CUBE_ROTATION;
+        if (attributes.hasValue(styleableIndex)) {
+            initialRotation = attributes.getString(styleableIndex);
+        }
+        setupInitialViewAngle(initialRotation);
+    }
+
+    private void initBackFacesDistance(TypedArray attributes) {
+        int backFaceDistance = attributes.getInt(R.styleable.AnimCube_backFacesDistance, 0);
+        if (backFaceDistance >= 2 && backFaceDistance <= 10) {
+            this.showBackFaces = true;
+            this.faceShift = backFaceDistance;
+            if (this.faceShift < 1.0) {
+                this.showBackFaces = false;
+            } else {
+                this.faceShift /= 10.0;
+            }
+        } else {
+            this.showBackFaces = false;
+            this.faceShift = 0;
+        }
+    }
+
+    private void initGestureSensitivity(TypedArray attributes) {
+        float sensitivityCoefficient = attributes.getFloat(R.styleable.AnimCube_touchSensitivity, 1.0f);
+
+        if (sensitivityCoefficient < 0.1f) {
+            sensitivityCoefficient = 0.1f;
+        } else if (sensitivityCoefficient > 2) {
+            sensitivityCoefficient = 2f;
+        }
+
+        this.touchSensitivityCoefficient = 5.0f * 1.0f / sensitivityCoefficient;
+    }
+
+    private void initScale(TypedArray attributes) {
+        int scaleParam = attributes.getInt(R.styleable.AnimCube_scale, 0);
+        this.scale = 1.0 / (1.0 + scaleParam / 10.0);
+    }
+
+    private void initPerspective(TypedArray attributes) {
+        this.perspective = attributes.getInt(R.styleable.AnimCube_perspective, 2);
+    }
+
+    private void initVerticalAlign(TypedArray attributes) {
+        int styleableIndex = R.styleable.AnimCube_verticalAlign;
+        if (attributes.hasValue(styleableIndex)) {
+            String alignParam = attributes.getString(styleableIndex);
+            if (alignParam == null) {
+                align = 1;
+            } else {
+                if (CubeConstants.TOP_ALIGN.equals(alignParam)) // top
+                    align = 0;
+                else if (CubeConstants.CENTER_ALIGN.equals(alignParam)) // center
+                    align = 1;
+                else if (CubeConstants.BOTTOM_ALIGN.equals(alignParam)) // bottom
+                    align = 2;
+            }
+        } else {
+            align = 1;
+        }
+    }
+
+    private void initSingleRotationSpeed(TypedArray attributes) {
+        this.speed = attributes.getInt(R.styleable.AnimCube_single_rotation_speed, 5);
+    }
+
+    private void initDoubleRotationSpeed(TypedArray attributes) {
+        this.doubleSpeed = attributes.getInt(R.styleable.AnimCube_double_rotation_speed, this.speed * 3 / 2);
+    }
+//TODO revise this
+//    public void init() {
+//        // setup window background color
+//        param = getParameter("bgcolor");
+//        if (param != null && param.length() == 6) {
+//            for (int i = 0; i < 6; i++) {
+//                for (int j = 0; j < 16; j++) {
+//                    if (Character.toLowerCase(param.charAt(i)) == "0123456789abcdef".charAt(j)) {
+//                        hex[i] = j;
+//                        break;
+//                    }
+//                }
+//            }
+//            backgroundColor = new Color(hex[0] * 16 + hex[1], hex[2] * 16 + hex[3], hex[4] * 16 + hex[5]);
+//        } else
+//            backgroundColor = CubeUtils.colors[16];
+//        // custom colors
+//        param = getParameter("colors");
+//        if (param != null) {
+//            for (int k = 0; k < 10 && k < param.length() / 6; k++) {
+//                for (int i = 0; i < 6; i++) {
+//                    for (int j = 0; j < 16; j++) {
+//                        if (Character.toLowerCase(param.charAt(k * 6 + i)) == "0123456789abcdef".charAt(j)) {
+//                            hex[i] = j;
+//                            break;
+//                        }
+//                    }
+//                }
+//                CubeUtils.colors[k] = new Color(hex[0] * 16 + hex[1], hex[2] * 16 + hex[3], hex[4] * 16 + hex[5]);
+//            }
+//        }
+//        // clean the cube
+//        for (int i = 0; i < 6; i++)
+//            for (int j = 0; j < 9; j++)
+//                cube[i][j] = i + 10;
+//        String initialPosition = "lluu";
+//        // setup color configuration of the solved cube
+//        param = getParameter("colorscheme");
+//        if (param != null && param.length() == 6) {
+//            for (int i = 0; i < 6; i++) { // udfblr
+//                int color = 23;
+//                for (int j = 0; j < 23; j++) {
+//                    if (Character.toLowerCase(param.charAt(i)) == "0123456789wyorgbldmcpnk".charAt(j)) {
+//                        color = j;
+//                        break;
+//                    }
+//                }
+//                for (int j = 0; j < 9; j++)
+//                    cube[i][j] = color;
+//            }
+//        }
+//        //TODO
+//        // setup color facelets
+//        param = getParameter("facelets");
+//        if (param != null && param.length() == 54) {
+//            for (int i = 0; i < 6; i++) {
+//                for (int j = 0; j < 9; j++) {
+//                    cube[i][j] = 23;
+//                    for (int k = 0; k < 23; k++) {
+//                        if (Character.toLowerCase(param.charAt(i * 9 + j)) == "0123456789wyorgbldmcpnk".charAt(k)) {
+//                            cube[i][j] = k;
+//                            break;
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//        // setup move sequence (and info texts)
+//        param = getParameter("move");
+//        move = (param == null ? new int[0][0] : getMove(param, true));
+//        movePos = 0;
+//        // setup initial move sequence
+//        param = getParameter("initmove");
+//        if (param != null) {
+//            int[][] initialMove = param.equals("#") ? move : getMove(param, false);
+//            if (initialMove.length > 0)
+//                doMove(cube, initialMove[0], 0, initialMove[0].length, false);
+//        }
+//        // setup initial reversed move sequence
+//        param = getParameter("initrevmove");
+//        if (param != null) {
+//            int[][] initialReversedMove = param.equals("#") ? move : getMove(param, false);
+//            if (initialReversedMove.length > 0)
+//                doMove(cube, initialReversedMove[0], 0, initialReversedMove[0].length, true);
+//        }
+//        // setup initial reversed move sequence
+//        param = getParameter("demo");
+//        if (param != null) {
+//            demoMove = param.equals("#") ? move : getMove(param, true);
+//            if (demoMove.length > 0 && demoMove[0].length > 0)
+//                demo = true;
+//        }
+//        // setup initial cube position
+//        param = getParameter("position");
+//        vNorm(vMul(eyeY, eye, eyeX));
+//        if (param == null)
+//            param = initialPosition;
+//        double pi12 = Math.PI / 12;
+//        for (int i = 0; i < param.length(); i++) {
+//            double angle = pi12;
+//            switch (Character.toLowerCase(param.charAt(i))) {
+//                case 'd':
+//                    angle = -angle;
+//                case 'u':
+//                    vRotY(eye, angle);
+//                    vRotY(eyeX, angle);
+//                    break;
+//                case 'f':
+//                    angle = -angle;
+//                case 'b':
+//                    vRotZ(eye, angle);
+//                    vRotZ(eyeX, angle);
+//                    break;
+//                case 'l':
+//                    angle = -angle;
+//                case 'r':
+//                    vRotX(eye, angle);
+//                    vRotX(eyeX, angle);
+//                    break;
+//            }
+//        }
+//        vNorm(vMul(eyeY, eye, eyeX)); // fix eyeY
+//        // setup quarter-turn speed and double-turn speed
+//        speed = 0;
+//        doubleSpeed = 0;
+//        param = getParameter("speed");
+//        if (param != null)
+//            for (int i = 0; i < param.length(); i++)
+//                if (param.charAt(i) >= '0' && param.charAt(i) <= '9')
+//                    speed = speed * 10 + (int) param.charAt(i) - '0';
+//        param = getParameter("doublespeed");
+//        if (param != null)
+//            for (int i = 0; i < param.length(); i++)
+//                if (param.charAt(i) >= '0' && param.charAt(i) <= '9')
+//                    doubleSpeed = doubleSpeed * 10 + (int) param.charAt(i) - '0';
+//        if (speed == 0)
+//            speed = 10;
+//        if (doubleSpeed == 0)
+//            doubleSpeed = speed * 3 / 2;
+//        // perspective deformation
+//        perspective = 0;
+//        param = getParameter("perspective");
+//        if (param == null)
+//            perspective = 2;
+//        else
+//            for (int i = 0; i < param.length(); i++)
+//                if (param.charAt(i) >= '0' && param.charAt(i) <= '9')
+//                    perspective = perspective * 10 + (int) param.charAt(i) - '0';
+//        // cube scale
+//        int intscale = 0;
+//        param = getParameter("scale");
+//        if (param != null)
+//            for (int i = 0; i < param.length(); i++)
+//                if (param.charAt(i) >= '0' && param.charAt(i) <= '9')
+//                    intscale = intscale * 10 + (int) param.charAt(i) - '0';
+//        scale = 1.0 / (1.0 + intscale / 10.0);
+//        // showBackFaces displaying
+//        showBackFaces = false;
+//        param = getParameter("showBackFaces");
+//        if (param != null) {
+//            showBackFaces = true;
+//            faceShift = 0.0;
+//            for (int i = 0; i < param.length(); i++)
+//                if (param.charAt(i) >= '0' && param.charAt(i) <= '9')
+//                    faceShift = faceShift * 10 + (int) param.charAt(i) - '0';
+//            if (faceShift < 1.0)
+//                showBackFaces = false;
+//            else
+//                faceShift /= 10.0;
+//        }
+//        progressHeight = move.length == 0 ? 0 : 6;
+//
+//        // whether the cube can be edited with mouse
+//        param = getParameter("edit");
+//        if ("0".equals(param))
+//            editable = false;
+//        else
+//            editable = true;
+//
+//        // metric
+//        metric = 0;
+//        param = getParameter("metric");
+//        if (param != null) {
+//            if ("1".equals(param)) // quarter-turn
+//                metric = 1;
+//            else if ("2".equals(param)) // face-turn
+//                metric = 2;
+//            else if ("3".equals(param)) // slice-turn
+//                metric = 3;
+//        }
+//        // metric
+//        align = 1;
+//        param = getParameter("align");
+//        if (param != null) {
+//            if ("0".equals(param)) // top
+//                align = 0;
+//            else if ("1".equals(param)) // center
+//                align = 1;
+//            else if ("2".equals(param)) // bottom
+//                align = 2;
+//        }
+//        // setup initial values
+//        for (int i = 0; i < 6; i++)
+//            for (int j = 0; j < 9; j++)
+//                initialCube[i][j] = cube[i][j];
+//        for (int i = 0; i < 3; i++) {
+//            initialEye[i] = eye[i];
+//            initialEyeX[i] = eyeX[i];
+//            initialEyeY[i] = eyeY[i];
+//        }
+//        // setup colors (contrast)
+//        int red = backgroundColor.getRed();
+//        int green = backgroundColor.getGreen();
+//        int blue = backgroundColor.getBlue();
+//        bgColor2 = new Color(red / 2, green / 2, blue / 2);
+//        if (demo)
+//            startAnimation(-1);
+//    } // init()
+
+//    private int[][] getMove(String sequence) {
+//        int num = 1;
+//        int pos = sequence.indexOf(';');
+//        while (pos != -1) {
+//            num++;
+//            pos = sequence.indexOf(';', pos + 1);
+//        }
+//        int[][] move = new int[num][];
+//        int lastPos = 0;
+//        pos = sequence.indexOf(';');
+//        num = 0;
+//        while (pos != -1) {
+//            move[num++] = getMovePart(sequence.substring(lastPos, pos));
+//            lastPos = pos + 1;
+//            pos = sequence.indexOf(';', lastPos);
+//        }
+//        move[num] = getMovePart(sequence.substring(lastPos));
+//        return move;
+//    }
+//    private int[] getMovePart(String sequence) {
+//        int length = 0;
+//        int[] move = new int[sequence.length()]; // overdimmensioned
+//        for (int i = 0; i < sequence.length(); i++) {
+//            if (sequence.charAt(i) == '.') {
+//                move[length] = -1;
+//                length++;
+//            } else if (sequence.charAt(i) == '{') {
+//                i++;
+//                while (i < sequence.length()) {
+//                    if (sequence.charAt(i) == '}')
+//                        break;
+//                    i++;
+//                }
+//            } else {
+//                for (int j = 0; j < 21; j++) {
+//                    if (sequence.charAt(i) == "UDFBLRESMXYZxyzudfblr".charAt(j)) {
+//                        i++;
+//                        int mode = moveModes[j];
+//                        move[length] = moveCodes[j] * 24;
+//                        if (i < sequence.length()) {
+//                            if (moveModes[j] == 0) { // modifiers for basic characters UDFBLR
+//                                for (int k = 0; k < modeChar.length; k++) {
+//                                    if (sequence.charAt(i) == modeChar[k]) {
+//                                        mode = k + 1;
+//                                        i++;
+//                                        break;
+//                                    }
+//                                }
+//                            }
+//                        }
+//                        move[length] += mode * 4;
+//                        if (i < sequence.length()) {
+//                            if (sequence.charAt(i) == '1')
+//                                i++;
+//                            else if (sequence.charAt(i) == '\'' || sequence.charAt(i) == '3') {
+//                                move[length] += 2;
+//                                i++;
+//                            } else if (sequence.charAt(i) == '2') {
+//                                i++;
+//                                if (i < sequence.length() && sequence.charAt(i) == '\'') {
+//                                    move[length] += 3;
+//                                    i++;
+//                                } else
+//                                    move[length] += 1;
+//                            }
+//                        }
+//                        length++;
+//                        i--;
+//                        break;
+//                    }
+//                }
+//            }
+//        }
+//        int[] returnMove = new int[length];
+//        for (int i = 0; i < length; i++)
+//            returnMove[i] = move[i];
+//        return returnMove;
+//    }
+
+    private void paint() {
+        synchronized (animThread) {
+            Canvas canvas = surfaceHolder.lockCanvas();
+            drawTheCanvas(canvas);
+            surfaceHolder.unlockCanvasAndPost(canvas);
+        }
+
+    }
+
+    private void drawTheCanvas(Canvas canvas) {
+        paint.setColor(backgroundColor.colorCode);
+        canvas.drawPaint(paint);
+        int height = getHeight();
+        int width = getWidth();
+        // create offscreen buffer for double buffering
+        if (width != this.width || height != this.height) {
+            this.width = width;
+            this.height = height;
+        }
+
+        dragAreas = 0;
+        if (natural) // compact cube
+            fixBlock(canvas, eye, eyeX, eyeY, cubeBlocks, 3); // draw cube and fill drag areas
+        else { // in twisted state
+            // compute top observer
+            double cosA = Math.cos(originalAngle + currentAngle);
+            double sinA = Math.sin(originalAngle + currentAngle) * rotSign[twistedLayer];
+            for (int i = 0; i < 3; i++) {
+                tempEye[i] = 0;
+                tempEyeX[i] = 0;
+                for (int j = 0; j < 3; j++) {
+                    int axis = twistedLayer / 2;
+                    tempEye[i] += eye[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosA + rotSin[axis][i][j] * sinA);
+                    tempEyeX[i] += eyeX[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosA + rotSin[axis][i][j] * sinA);
+                }
+            }
+            vMul(tempEyeY, tempEye, tempEyeX);
+            // compute bottom anti-observer
+            double cosB = Math.cos(originalAngle - currentAngle);
+            double sinB = Math.sin(originalAngle - currentAngle) * rotSign[twistedLayer];
+            for (int i = 0; i < 3; i++) {
+                tempEye2[i] = 0;
+                tempEyeX2[i] = 0;
+                for (int j = 0; j < 3; j++) {
+                    int axis = twistedLayer / 2;
+                    tempEye2[i] += eye[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosB + rotSin[axis][i][j] * sinB);
+                    tempEyeX2[i] += eyeX[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosB + rotSin[axis][i][j] * sinB);
+                }
+            }
+            vMul(tempEyeY2, tempEye2, tempEyeX2);
+            eyeArray[0] = eye;
+            eyeArrayX[0] = eyeX;
+            eyeArrayY[0] = eyeY;
+            eyeArray[1] = tempEye;
+            eyeArrayX[1] = tempEyeX;
+            eyeArrayY[1] = tempEyeY;
+            eyeArray[2] = tempEye2;
+            eyeArrayX[2] = tempEyeX2;
+            eyeArrayY[2] = tempEyeY2;
+            blockArray[0] = topBlocks;
+            blockArray[1] = midBlocks;
+            blockArray[2] = botBlocks;
+            // perspective corrections
+            vSub(vScale(vCopy(perspEye, eye), 5.0 + perspective), vScale(vCopy(perspNormal, faceNormals[twistedLayer]), 1.0 / 3.0));
+            vSub(vScale(vCopy(perspEyeI, eye), 5.0 + perspective), vScale(vCopy(perspNormal, faceNormals[twistedLayer ^ 1]), 1.0 / 3.0));
+            double topProd = vProd(perspEye, faceNormals[twistedLayer]);
+            double botProd = vProd(perspEyeI, faceNormals[twistedLayer ^ 1]);
+            int orderMode;
+            if (topProd < 0 && botProd > 0) // top facing away
+                orderMode = 0;
+            else if (topProd > 0 && botProd < 0) // bottom facing away: draw it first
+                orderMode = 1;
+            else // both top and bottom layer facing away: draw them first
+                orderMode = 2;
+            fixBlock(canvas,
+                    eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
+                    eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
+                    eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
+                    blockArray[CubeUtils.drawOrder[orderMode][0]],
+                    CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][0]]);
+            fixBlock(canvas,
+                    eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
+                    eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
+                    eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
+                    blockArray[CubeUtils.drawOrder[orderMode][1]],
+                    CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][1]]);
+            fixBlock(canvas,
+                    eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
+                    eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
+                    eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
+                    blockArray[CubeUtils.drawOrder[orderMode][2]],
+                    CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][2]]);
+        }
+    }
+
+    private void repaint() {
+        synchronized (renderThread) {
+            renderHandler.removeCallbacks(paintRunnable);
+            renderHandler.post(paintRunnable);
+        }
+    }
+
+    private int[][] getMove(String sequence, boolean info) {
+        if (info) {
+            int pos = sequence.indexOf('{');
+            while (pos != -1) {
+                pos = sequence.indexOf('{', pos + 1);
+            }
+        }
+        int num = 1;
+        int pos = sequence.indexOf(';');
+        while (pos != -1) {
+            num++;
+            pos = sequence.indexOf(';', pos + 1);
+        }
+        int[][] move = new int[num][];
+        int lastPos = 0;
+        pos = sequence.indexOf(';');
+        num = 0;
+        while (pos != -1) {
+            move[num++] = getMovePart(sequence.substring(lastPos, pos), info);
+            lastPos = pos + 1;
+            pos = sequence.indexOf(';', lastPos);
+        }
+        move[num] = getMovePart(sequence.substring(lastPos), info);
+        return move;
+    }
+
+    private int[] getMovePart(String sequence, boolean info) {
+        int length = 0;
+        int[] move = new int[sequence.length()];
+        // overdimmensioned
+        for (int i = 0; i < sequence.length(); i++) {
+            if (sequence.charAt(i) == '.') {
+                move[length] = -1;
+                length++;
+            } else if (sequence.charAt(i) == '{') {
+                i++;
+                String s = "";
+                while (i < sequence.length()) {
+                    if (sequence.charAt(i) == '}')
+                        break;
+                    if (info)
+                        s += sequence.charAt(i);
+                    i++;
+                }
+            } else {
+                for (int j = 0; j < 21; j++) {
+                    if (sequence.charAt(i) == "UDFBLRESMXYZxyzudfblr".charAt(j)) {
+                        i++;
+                        int mode = CubeConstants.moveModes[j];
+                        move[length] = CubeConstants.moveCodes[j] * 24;
+                        if (i < sequence.length()) {
+                            if (CubeConstants.moveModes[j] == 0) { // modifiers
+                                // for basic
+                                // characters
+                                // UDFBLR
+                                for (int k = 0; k < CubeConstants.modeChar.length; k++) {
+                                    if (sequence.charAt(i) == CubeConstants.modeChar[k]) {
+                                        mode = k + 1;
+                                        i++;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        move[length] += mode * 4;
+                        if (i < sequence.length()) {
+                            if (sequence.charAt(i) == '1')
+                                i++;
+                            else if (sequence.charAt(i) == '\''
+                                    || sequence.charAt(i) == '3') {
+                                move[length] += 2;
+                                i++;
+                            } else if (sequence.charAt(i) == '2') {
+                                i++;
+                                if (i < sequence.length()
+                                        && sequence.charAt(i) == '\'') {
+                                    move[length] += 3;
+                                    i++;
+                                } else
+                                    move[length] += 1;
+                            }
+                        }
+                        length++;
+                        i--;
+                        break;
+                    }
+                }
+            }
+        }
+        int[] returnMove = new int[length];
+        for (int i = 0; i < length; i++)
+            returnMove[i] = move[i];
+        return returnMove;
+    }
+
+    private void setupInitialViewAngle(String initialPosition) {
+        CubeUtils.vNorm(CubeUtils.vMul(eyeY, eye, eyeX));
+        double pi12 = Math.PI / 12;
+        for (int i = 0; i < initialPosition.length(); i++) {
+            double angle = pi12;
+            switch (Character.toLowerCase(initialPosition.charAt(i))) {
+                case 'd':
+                    angle = -angle;
+                case 'u':
+                    CubeUtils.vRotY(eye, angle);
+                    CubeUtils.vRotY(eyeX, angle);
+                    break;
+                case 'f':
+                    angle = -angle;
+                case 'b':
+                    CubeUtils.vRotZ(eye, angle);
+                    CubeUtils.vRotZ(eyeX, angle);
+                    break;
+                case 'l':
+                    angle = -angle;
+                case 'r':
+                    CubeUtils.vRotX(eye, angle);
+                    CubeUtils.vRotX(eyeX, angle);
+                    break;
+            }
+        }
+        CubeUtils.vNorm(CubeUtils.vMul(eyeY, eye, eyeX)); // fix eyeY
+    }
+
+    private void doMove(int[][] cube, int[] move, int start, int length, boolean reversed) {
+        int position = reversed ? start + length : start;
+        while (true) {
+            if (reversed) {
+                if (position <= start)
+                    break;
+                position--;
+            }
+            if (move[position] < 1000 && move[position] >= 0) {
+                int modifier = move[position] % 4 + 1;
+                int mode = move[position] / 4 % 6;
+                if (modifier == 4) // reversed double turn
+                    modifier = 2;
+                if (reversed)
+                    modifier = 4 - modifier;
+                twistLayers(cube, move[position] / 24, modifier, mode);
+            }
+            if (!reversed) {
+                position++;
+                if (position >= start + length)
+                    break;
+            }
+        }
+    }
+
+    private void animateCube() {
         synchronized (animThread) {
             interrupted = false;
             do {
                 if (restarted) {
-                    //System.err.println("run: notify");
+                    Log.e(TAG, "run: notify");
                     animThread.notify();
                 }
                 try {
-                    //System.err.println("run: wait");
+                    Log.e(TAG, "run: wait");
                     animThread.wait();
-                    //System.err.println("run: run");
+                    Log.e(TAG, "run: run");
                 } catch (InterruptedException e) {
                     break;
                 }
@@ -955,15 +1070,12 @@ public final class AnimCube extends SurfaceView implements Runnable {
                     continue;
                 boolean restart = false;
                 animating = true;
-                drawButtons = true;
-                int[] mv = demo ? demoMove[0] : move[curMove];
+                int[] mv = demo ? demoMove[0] : move[NEXT_MOVE];
                 if (moveDir > 0) {
                     if (movePos >= mv.length) {
                         movePos = 0;
-                        initInfoText(mv);
                     }
                 } else {
-                    curInfoText = -1;
                     if (movePos == 0)
                         movePos = mv.length;
                 }
@@ -977,9 +1089,7 @@ public final class AnimCube extends SurfaceView implements Runnable {
                         repaint();
                         if (!moveOne)
                             sleep(33 * speed);
-                    } else if (mv[movePos] >= 1000) {
-                        curInfoText = moveDir > 0 ? mv[movePos] - 1000 : -1;
-                    } else {
+                    } else if (mv[movePos] < 1000) {
                         int num = mv[movePos] % 4 + 1;
                         int mode = mv[movePos] / 4 % 6;
                         boolean clockwise = num < 3;
@@ -996,25 +1106,21 @@ public final class AnimCube extends SurfaceView implements Runnable {
                     if (moveDir > 0) {
                         movePos++;
                         if (movePos < mv.length && mv[movePos] >= 1000) {
-                            curInfoText = mv[movePos] - 1000;
                             movePos++;
                         }
                         if (movePos == mv.length) {
                             if (!demo)
                                 break;
                             movePos = 0;
-                            initInfoText(mv);
                             for (int i = 0; i < 6; i++)
                                 for (int j = 0; j < 9; j++)
                                     cube[i][j] = initialCube[i][j];
                         }
-                    } else
-                        curInfoText = -1;
+                    }
                     if (interrupted || restarted || restart)
                         break;
                 }
                 animating = false;
-                drawButtons = true;
                 repaint();
                 if (demo) {
                     clear();
@@ -1022,7 +1128,7 @@ public final class AnimCube extends SurfaceView implements Runnable {
                 }
             } while (!interrupted);
         }
-        //System.err.println("Interrupted!");
+        Log.e(TAG, "Interrupted!");
     } // run()
 
     private void sleep(int time) {
@@ -1035,13 +1141,9 @@ public final class AnimCube extends SurfaceView implements Runnable {
         }
     }
 
-    // Mouse event handlers
-
     private void clear() {
         synchronized (animThread) {
             movePos = 0;
-            if (move.length > 0)
-                initInfoText(move[curMove]);
             natural = true;
             mirrored = false;
             for (int i = 0; i < 6; i++)
@@ -1158,151 +1260,13 @@ public final class AnimCube extends SurfaceView implements Runnable {
         }
     }
 
-    public void paint(Graphics g) {
-        Dimension size = getSize(); // inefficient - Java 1.1
-        // create offscreen buffer for double buffering
-        if (image == null || size.width != width || size.height - buttonHeight != height) {
-            width = size.width;
-            height = size.height;
-            image = createImage(width, height);
-            graphics = image.getGraphics();
-            textHeight = graphics.getFontMetrics().getHeight() - graphics.getFontMetrics().getLeading();
-            if (buttonBar == 1)
-                height -= buttonHeight;
-            drawButtons = true;
-        }
-        graphics.setColor(bgColor);
-        graphics.setClip(0, 0, width, height);
-        graphics.fillRect(0, 0, width, height);
-        synchronized (animThread) {
-            dragAreas = 0;
-            if (natural) // compact cube
-                fixBlock(eye, eyeX, eyeY, cubeBlocks, 3); // draw cube and fill drag areas
-            else { // in twisted state
-                // compute top observer
-                double cosA = Math.cos(originalAngle + currentAngle);
-                double sinA = Math.sin(originalAngle + currentAngle) * rotSign[twistedLayer];
-                for (int i = 0; i < 3; i++) {
-                    tempEye[i] = 0;
-                    tempEyeX[i] = 0;
-                    for (int j = 0; j < 3; j++) {
-                        int axis = twistedLayer / 2;
-                        tempEye[i] += eye[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosA + rotSin[axis][i][j] * sinA);
-                        tempEyeX[i] += eyeX[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosA + rotSin[axis][i][j] * sinA);
-                    }
-                }
-                vMul(tempEyeY, tempEye, tempEyeX);
-                // compute bottom anti-observer
-                double cosB = Math.cos(originalAngle - currentAngle);
-                double sinB = Math.sin(originalAngle - currentAngle) * rotSign[twistedLayer];
-                for (int i = 0; i < 3; i++) {
-                    tempEye2[i] = 0;
-                    tempEyeX2[i] = 0;
-                    for (int j = 0; j < 3; j++) {
-                        int axis = twistedLayer / 2;
-                        tempEye2[i] += eye[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosB + rotSin[axis][i][j] * sinB);
-                        tempEyeX2[i] += eyeX[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosB + rotSin[axis][i][j] * sinB);
-                    }
-                }
-                vMul(tempEyeY2, tempEye2, tempEyeX2);
-                eyeArray[0] = eye;
-                eyeArrayX[0] = eyeX;
-                eyeArrayY[0] = eyeY;
-                eyeArray[1] = tempEye;
-                eyeArrayX[1] = tempEyeX;
-                eyeArrayY[1] = tempEyeY;
-                eyeArray[2] = tempEye2;
-                eyeArrayX[2] = tempEyeX2;
-                eyeArrayY[2] = tempEyeY2;
-                blockArray[0] = topBlocks;
-                blockArray[1] = midBlocks;
-                blockArray[2] = botBlocks;
-                // perspective corrections
-                vSub(vScale(vCopy(perspEye, eye), 5.0 + persp), vScale(vCopy(perspNormal, faceNormals[twistedLayer]), 1.0 / 3.0));
-                vSub(vScale(vCopy(perspEyeI, eye), 5.0 + persp), vScale(vCopy(perspNormal, faceNormals[twistedLayer ^ 1]), 1.0 / 3.0));
-                double topProd = vProd(perspEye, faceNormals[twistedLayer]);
-                double botProd = vProd(perspEyeI, faceNormals[twistedLayer ^ 1]);
-                int orderMode;
-                if (topProd < 0 && botProd > 0) // top facing away
-                    orderMode = 0;
-                else if (topProd > 0 && botProd < 0) // bottom facing away: draw it first
-                    orderMode = 1;
-                else // both top and bottom layer facing away: draw them first
-                    orderMode = 2;
-                fixBlock(eyeArray[eyeOrder[twistedMode][drawOrder[orderMode][0]]],
-                        eyeArrayX[eyeOrder[twistedMode][drawOrder[orderMode][0]]],
-                        eyeArrayY[eyeOrder[twistedMode][drawOrder[orderMode][0]]],
-                        blockArray[drawOrder[orderMode][0]],
-                        blockMode[twistedMode][drawOrder[orderMode][0]]);
-                fixBlock(eyeArray[eyeOrder[twistedMode][drawOrder[orderMode][1]]],
-                        eyeArrayX[eyeOrder[twistedMode][drawOrder[orderMode][1]]],
-                        eyeArrayY[eyeOrder[twistedMode][drawOrder[orderMode][1]]],
-                        blockArray[drawOrder[orderMode][1]],
-                        blockMode[twistedMode][drawOrder[orderMode][1]]);
-                fixBlock(eyeArray[eyeOrder[twistedMode][drawOrder[orderMode][2]]],
-                        eyeArrayX[eyeOrder[twistedMode][drawOrder[orderMode][2]]],
-                        eyeArrayY[eyeOrder[twistedMode][drawOrder[orderMode][2]]],
-                        blockArray[drawOrder[orderMode][2]],
-                        blockMode[twistedMode][drawOrder[orderMode][2]]);
-            }
-            if (!pushed && !animating) // no button should be deceased
-                buttonPressed = -1;
-            if (!demo && move.length > 0) {
-                if (move[curMove].length > 0) { // some turns
-                    graphics.setColor(Color.black);
-                    graphics.drawRect(0, height - progressHeight, width - 1, progressHeight - 1);
-                    graphics.setColor(textColor);
-                    int progress = (width - 2) * realMovePos(move[curMove], movePos) / realMoveLength(move[curMove]);
-                    graphics.fillRect(1, height - progressHeight + 1, progress, progressHeight - 2);
-                    graphics.setColor(bgColor.darker());
-                    graphics.fillRect(1 + progress, height - progressHeight + 1, width - 2 - progress, progressHeight - 2);
-                    String s = "" + moveLength(move[curMove], movePos) + "/" + moveLength(move[curMove], -1) + metricChar[metric];
-                    int w = graphics.getFontMetrics().stringWidth(s);
-                    int x = width - w - 2;
-                    int y = height - progressHeight - 2; //int base = graphics.getFontMetrics().getDescent();
-                    if (moveText > 0 && textHeight > 0) {
-                        drawString(graphics, s, x, y - textHeight);
-                        drawMoveText(graphics, y);
-                    } else
-                        drawString(graphics, s, x, y);
-                }
-                if (move.length > 1) { // more sequences
-                    graphics.setClip(0, 0, width, height);
-                    int b = graphics.getFontMetrics().getDescent();
-                    int y = textHeight - b;
-                    String s = "" + (curMove + 1) + "/" + move.length;
-                    int w = graphics.getFontMetrics().stringWidth(s);
-                    int x = width - w - buttonHeight - 2;
-                    drawString(graphics, s, x, y);
-                    // draw button
-                    graphics.setColor(buttonBgColor);
-                    graphics.fill3DRect(width - buttonHeight, 0, buttonHeight, buttonHeight, buttonPressed != 7);
-                    drawButton(graphics, 7, width - buttonHeight / 2, buttonHeight / 2);
-                }
-            }
-            if (curInfoText >= 0) {
-                graphics.setClip(0, 0, width, height);
-                int b = graphics.getFontMetrics().getDescent();
-                int y = textHeight - b;
-                drawString(graphics, infoText[curInfoText], 0, y);
-            }
-            if (drawButtons && buttonBar != 0) // omit unneccessary redrawing
-                drawButtons(graphics);
-        }
-        g.drawImage(image, 0, 0, this);
-    } // paint()
-
-    public void update(Graphics g) {
-        paint(g);
-    }
-
-    private void fixBlock(double[] eye, double[] eyeX, double[] eyeY, int[][][] blocks, int mode) {
+    private void fixBlock(Canvas canvas, double[] eye, double[] eyeX, double[] eyeY, int[][][] blocks, int mode) {
         // project 3D co-ordinates into 2D screen ones
         for (int i = 0; i < 8; i++) {
             double min = width < height ? width : height - progressHeight;
             double x = min / 3.7 * vProd(cornerCoords[i], eyeX) * scale;
             double y = min / 3.7 * vProd(cornerCoords[i], eyeY) * scale;
-            double z = min / (5.0 + persp) * vProd(cornerCoords[i], eye) * scale;
+            double z = min / (5.0 + perspective) * vProd(cornerCoords[i], eye) * scale;
             x = x / (1 - z / min); // perspective transformation
             y = y / (1 - z / min); // perspective transformation
             coordsX[i] = width / 2.0 + x;
@@ -1320,15 +1284,15 @@ public final class AnimCube extends SurfaceView implements Runnable {
                 cooY[i][j] = coordsY[faceCorners[i][j]];
             }
         }
-        if (hint) { // draw hint hiden facelets
+        if (showBackFaces) { // draw showBackFaces hiden facelets
             for (int i = 0; i < 6; i++) { // all faces
-                vSub(vScale(vCopy(perspEye, eye), 5.0 + persp), faceNormals[i]); // perspective correction
+                vSub(vScale(vCopy(perspEye, eye), 5.0 + perspective), faceNormals[i]); // perspective correction
                 if (vProd(perspEye, faceNormals[i]) < 0) { // draw only hiden faces
                     vScale(vCopy(tempNormal, faceNormals[i]), faceShift);
                     double min = width < height ? width : height - progressHeight;
                     double x = min / 3.7 * vProd(tempNormal, eyeX);
                     double y = min / 3.7 * vProd(tempNormal, eyeY);
-                    double z = min / (5.0 + persp) * vProd(tempNormal, eye);
+                    double z = min / (5.0 + perspective) * vProd(tempNormal, eye);
                     x = x / (1 - z / min); // perspective transformation
                     y = y / (1 - z / min); // perspective transformation
                     int sideW = blocks[i][0][1] - blocks[i][0][0];
@@ -1342,10 +1306,20 @@ public final class AnimCube extends SurfaceView implements Runnable {
                                     fillX[j] += mirrored ? -x : x;
                                     fillY[j] -= y;
                                 }
-                                graphics.setColor(colors[cube[i][p * 3 + q]]);
-                                graphics.fillPolygon(fillX, fillY, 4);
-                                graphics.setColor(colors[cube[i][p * 3 + q]].darker());
-                                graphics.drawPolygon(fillX, fillY, 4);
+                                paint.setColor(colors[cube[i][p * 3 + q]].colorCode);
+                                paint.setStyle(Paint.Style.FILL);
+
+                                path.reset();
+                                path.moveTo(fillX[0], fillY[0]);
+                                path.lineTo(fillX[1], fillY[1]);
+                                path.lineTo(fillX[2], fillY[2]);
+                                path.lineTo(fillX[3], fillY[3]);
+                                path.close();
+
+                                canvas.drawPath(path, paint);
+                                paint.setStyle(Paint.Style.STROKE);
+                                paint.setColor(colors[cube[i][p * 3 + q]].darker().colorCode);
+                                canvas.drawPath(path, paint);
                             }
                         }
                     }
@@ -1360,10 +1334,16 @@ public final class AnimCube extends SurfaceView implements Runnable {
                 for (int j = 0; j < 4; j++) // corner co-ordinates
                     getCorners(i, j, fillX, fillY, blocks[i][0][factors[j][0]], blocks[i][1][factors[j][1]], mirrored);
                 if (sideW == 3 && sideH == 3)
-                    graphics.setColor(bgColor2);
+                    paint.setColor(bgColor2.colorCode);
                 else
-                    graphics.setColor(Color.black);
-                graphics.drawPolygon(fillX, fillY, 4);
+                    paint.setColor(android.graphics.Color.BLACK);
+                path.reset();
+                path.moveTo(fillX[0], fillY[0]);
+                path.lineTo(fillX[1], fillY[1]);
+                path.lineTo(fillX[2], fillY[2]);
+                path.lineTo(fillX[3], fillY[3]);
+                path.close();
+                canvas.drawPath(path, paint);
             }
         }
         // find and draw black inner faces
@@ -1378,19 +1358,37 @@ public final class AnimCube extends SurfaceView implements Runnable {
                     if (mirrored)
                         fillX[j] = width - fillX[j];
                 }
-                graphics.setColor(Color.black);
-                graphics.fillPolygon(fillX, fillY, 4);
+                paint.setColor(android.graphics.Color.BLACK);
+
+                path.reset();
+                path.moveTo(fillX[0], fillY[0]);
+                path.lineTo(fillX[1], fillY[1]);
+                path.lineTo(fillX[2], fillY[2]);
+                path.lineTo(fillX[3], fillY[3]);
+                path.close();
+                paint.setStyle(Paint.Style.FILL);
+                canvas.drawPath(path, paint);
+
             } else {
                 // draw black face background (do not care about normals and visibility!)
                 for (int j = 0; j < 4; j++) // corner co-ordinates
                     getCorners(i, j, fillX, fillY, blocks[i][0][factors[j][0]], blocks[i][1][factors[j][1]], mirrored);
-                graphics.setColor(Color.black);
-                graphics.fillPolygon(fillX, fillY, 4);
+
+                paint.setColor(android.graphics.Color.BLACK);
+
+                path.reset();
+                path.moveTo(fillX[0], fillY[0]);
+                path.lineTo(fillX[1], fillY[1]);
+                path.lineTo(fillX[2], fillY[2]);
+                path.lineTo(fillX[3], fillY[3]);
+                path.close();
+                paint.setStyle(Paint.Style.FILL);
+                canvas.drawPath(path, paint);
             }
         }
         // draw all visible faces and get dragging regions
         for (int i = 0; i < 6; i++) { // all faces
-            vSub(vScale(vCopy(perspEye, eye), 5.0 + persp), faceNormals[i]); // perspective correction
+            vSub(vScale(vCopy(perspEye, eye), 5.0 + perspective), faceNormals[i]); // perspective correction
             if (vProd(perspEye, faceNormals[i]) > 0) { // draw only faces towards us
                 int sideW = blocks[i][0][1] - blocks[i][0][0];
                 int sideH = blocks[i][1][1] - blocks[i][1][0];
@@ -1400,10 +1398,26 @@ public final class AnimCube extends SurfaceView implements Runnable {
                         for (int o = 0, q = blocks[i][0][0]; o < sideW; o++, q++) {
                             for (int j = 0; j < 4; j++)
                                 getCorners(i, j, fillX, fillY, q + border[j][0], p + border[j][1], mirrored);
-                            graphics.setColor(colors[cube[i][p * 3 + q]].darker());
-                            graphics.drawPolygon(fillX, fillY, 4);
-                            graphics.setColor(colors[cube[i][p * 3 + q]]);
-                            graphics.fillPolygon(fillX, fillY, 4);
+
+                            paint.setColor(colors[cube[i][p * 3 + q]].darker().colorCode);
+
+                            path.reset();
+                            path.moveTo(fillX[0], fillY[0]);
+                            path.lineTo(fillX[1], fillY[1]);
+                            path.lineTo(fillX[2], fillY[2]);
+                            path.lineTo(fillX[3], fillY[3]);
+                            path.close();
+                            canvas.drawPath(path, paint);
+
+                            paint.setColor(colors[cube[i][p * 3 + q]].colorCode);
+                            path.reset();
+                            path.moveTo(fillX[0], fillY[0]);
+                            path.lineTo(fillX[1], fillY[1]);
+                            path.lineTo(fillX[2], fillY[2]);
+                            path.lineTo(fillX[3], fillY[3]);
+                            path.close();
+                            paint.setStyle(Paint.Style.FILL);
+                            canvas.drawPath(path, paint);
                         }
                     }
                 }
@@ -1471,181 +1485,36 @@ public final class AnimCube extends SurfaceView implements Runnable {
             cornersX[corner] = width - cornersX[corner];
     }
 
-    private void drawButtons(Graphics g) {
-        if (buttonBar == 2) { // only clear (rewind) button
-            g.setColor(buttonBgColor);
-            g.fill3DRect(0, height - buttonHeight, buttonHeight, buttonHeight, buttonPressed != 0);
-            drawButton(g, 0, buttonHeight / 2, height - (buttonHeight + 1) / 2);
-            return;
-        }
-        if (buttonBar == 1) { // full buttonbar
-            g.setClip(0, height, width, buttonHeight);
-            int buttonX = 0;
-            for (int i = 0; i < 7; i++) {
-                int buttonWidth = (width - buttonX) / (7 - i);
-                g.setColor(buttonBgColor);
-                g.fill3DRect(buttonX, height, buttonWidth, buttonHeight, buttonPressed != i);
-                drawButton(g, i, buttonX + buttonWidth / 2, height + buttonHeight / 2);
-                buttonX += buttonWidth;
-            }
-            drawButtons = false;
-            return;
-        }
-    }
-
-    private void drawButton(Graphics g, int i, int x, int y) {
-        g.setColor(Color.white);
-        switch (i) {
-            case 0: // rewind
-                drawRect(g, x - 4, y - 3, 3, 7);
-                drawArrow(g, x + 3, y, -1); // left
-                break;
-            case 1: // reverse step
-                drawRect(g, x + 2, y - 3, 3, 7);
-                drawArrow(g, x, y, -1); // left
-                break;
-            case 2: // reverse play
-                drawArrow(g, x + 2, y, -1); // left
-                break;
-            case 3: // stop / mirror
-                if (animating)
-                    drawRect(g, x - 3, y - 3, 7, 7);
-                else {
-                    drawRect(g, x - 3, y - 2, 7, 5);
-                    drawRect(g, x - 1, y - 4, 3, 9);
-                }
-                break;
-            case 4: // play
-                drawArrow(g, x - 2, y, 1); // right
-                break;
-            case 5: // step
-                drawRect(g, x - 4, y - 3, 3, 7);
-                drawArrow(g, x, y, 1); // right
-                break;
-            case 6: // fast forward
-                drawRect(g, x + 1, y - 3, 3, 7);
-                drawArrow(g, x - 4, y, 1); // right
-                break;
-            case 7: // next sequence
-                drawArrow(g, x - 2, y, 1); // right
-                break;
-        }
-    }
-
-    // Various useful vector functions
-
-    private void drawString(Graphics g, String s, int x, int y) {
-        if (outlined) {
-            g.setColor(Color.black);
-            for (int i = 0; i < textOffset.length; i += 2)
-                g.drawString(s, x + textOffset[i], y + textOffset[i + 1]);
-            g.setColor(Color.white);
-        } else
-            g.setColor(textColor);
-        g.drawString(s, x, y);
-    }
-
-    private void drawMoveText(Graphics g, int y) {
-        g.setClip(0, height - progressHeight - textHeight, width, textHeight);
-        g.setColor(Color.black);
-        int pos = movePos == 0 ? arrayMovePos(move[curMove], movePos) : movePos;
-        String s1 = moveText(move[curMove], 0, pos);
-        String s2 = turnText(move[curMove], pos);
-        String s3 = moveText(move[curMove], pos + 1, move[curMove].length);
-        int w1 = g.getFontMetrics().stringWidth(s1);
-        int w2 = g.getFontMetrics().stringWidth(s2);
-        int w3 = g.getFontMetrics().stringWidth(s3);
-        int x = 1;
-        if (x + w1 + w2 + w3 > width) {
-            x = Math.min(1, width / 2 - w1 - w2 / 2);
-            x = Math.max(x, width - w1 - w2 - w3 - 2);
-        }
-        if (w2 > 0) {
-            g.setColor(hlColor);
-            g.fillRect(x + w1 - 1, height - progressHeight - textHeight, w2 + 2, textHeight);
-        }
-        if (w1 > 0)
-            drawString(g, s1, x, y);
-        if (w2 > 0)
-            drawString(g, s2, x + w1, y);
-        if (w3 > 0)
-            drawString(g, s3, x + w1 + w2, y);
-    }
-
-    private int selectButton(int x, int y) {
-        if (buttonBar == 0)
-            return -1;
-        if (move.length > 1 && x >= width - buttonHeight && x < width && y >= 0 && y < buttonHeight)
-            return 7;
-        if (buttonBar == 2) { // only clear (rewind) button present
-            if (x >= 0 && x < buttonHeight && y >= height - buttonHeight && y < height)
-                return 0;
-            return -1;
-        }
-        if (y < height)
-            return -1;
-        int buttonX = 0;
-        for (int i = 0; i < 7; i++) {
-            int buttonWidth = (width - buttonX) / (7 - i);
-            if (x >= buttonX && x < buttonX + buttonWidth && y >= height && y < height + buttonHeight)
-                return i;
-            buttonX += buttonWidth;
-        }
-        return -1;
-    }
-
-    public void mousePressed(MouseEvent e) {
-        lastDragX = lastX = e.getX();
-        lastDragY = lastY = e.getY();
+    private void handlePointerDownEvent(MotionEvent e) {
+        lastDragX = lastX = Math.round(e.getX());
+        lastDragY = lastY = Math.round(e.getY());
         toTwist = false;
-        buttonPressed = selectButton(lastX, lastY);
-        if (buttonPressed >= 0) {
-            pushed = true;
-            if (buttonPressed == 3) {
-                if (!animating) // special feature
-                    mirrored = !mirrored;
-                else
-                    stopAnimation();
-            } else if (buttonPressed == 0) { // clear everything to the initial setup
-                stopAnimation();
-                clear();
-            } else if (buttonPressed == 7) { // next sequence
-                stopAnimation();
-                clear();
-                curMove = curMove < move.length - 1 ? curMove + 1 : 0;
-            } else
-                startAnimation(buttonAction[buttonPressed]);
-            drawButtons = true;
-            repaint();
-        } else if (progressHeight > 0 && move.length > 0 && move[curMove].length > 0 && lastY >= height - progressHeight && lastY < height) {
+        if (progressHeight > 0 && move.length > 0 && move[NEXT_MOVE].length > 0 && lastY >= height - progressHeight && lastY < height) {
             stopAnimation();
-            int len = realMoveLength(move[curMove]);
+            int len = realMoveLength(move[NEXT_MOVE]);
             int pos = ((lastX - 1) * len * 2 / (width - 2) + 1) / 2;
             pos = Math.max(0, Math.min(len, pos));
             if (pos > 0)
-                pos = arrayMovePos(move[curMove], pos);
+                pos = arrayMovePos(move[NEXT_MOVE], pos);
             if (pos > movePos)
-                doMove(cube, move[curMove], movePos, pos - movePos, false);
+                doMove(cube, move[NEXT_MOVE], movePos, pos - movePos, false);
             if (pos < movePos)
-                doMove(cube, move[curMove], pos, movePos - pos, true);
+                doMove(cube, move[NEXT_MOVE], pos, movePos - pos, true);
             movePos = pos;
             dragging = true;
             repaint();
         } else {
             if (mirrored)
                 lastDragX = lastX = width - lastX;
-            if (editable && !animating &&
-                    (e.getModifiers() & InputEvent.BUTTON1_MASK) != 0 &&
-                    (e.getModifiers() & InputEvent.SHIFT_MASK) == 0)
+            if (editable && !animating)
                 toTwist = true;
         }
     }
 
-    public void mouseReleased(MouseEvent e) {
+    private void handlePointerUpEvent() {
         dragging = false;
         if (pushed) {
             pushed = false;
-            drawButtons = true;
             repaint();
         } else if (twisting && !spinning) {
             twisting = false;
@@ -1667,28 +1536,28 @@ public final class AnimCube extends SurfaceView implements Runnable {
         }
     }
 
-    public void mouseDragged(MouseEvent e) {
+    private void handlePointerDragEvent(MotionEvent e) {
         if (pushed)
             return;
         if (dragging) {
             stopAnimation();
-            int len = realMoveLength(move[curMove]);
-            int pos = ((e.getX() - 1) * len * 2 / (width - 2) + 1) / 2;
+            int len = realMoveLength(move[NEXT_MOVE]);
+            int pos = ((Math.round(e.getX()) - 1) * len * 2 / (width - 2) + 1) / 2;
             pos = Math.max(0, Math.min(len, pos));
             if (pos > 0)
-                pos = arrayMovePos(move[curMove], pos);
+                pos = arrayMovePos(move[NEXT_MOVE], pos);
             if (pos > movePos)
-                doMove(cube, move[curMove], movePos, pos - movePos, false);
+                doMove(cube, move[NEXT_MOVE], movePos, pos - movePos, false);
             if (pos < movePos)
-                doMove(cube, move[curMove], pos, movePos - pos, true);
+                doMove(cube, move[NEXT_MOVE], pos, movePos - pos, true);
             movePos = pos;
             repaint();
             return;
         }
-        int x = mirrored ? width - e.getX() : e.getX();
-        int y = e.getY();
-        int dx = x - lastX;
-        int dy = y - lastY;
+        int x = mirrored ? width - Math.round(e.getX()) : Math.round(e.getX());
+        int y = Math.round(e.getY());
+        int dx = Math.round((x - lastX) / touchSensitivityCoefficient);
+        int dy = Math.round((y - lastY) / touchSensitivityCoefficient);
         if (editable && toTwist && !twisting && !animating) { // we do not twist but we can
             lastDragX = x;
             lastDragY = y;
@@ -1719,8 +1588,8 @@ public final class AnimCube extends SurfaceView implements Runnable {
             lastX = lastDragX;
             lastY = lastDragY;
         }
-        dx = x - lastX;
-        dy = y - lastY;
+        dx = Math.round((x - lastX) / touchSensitivityCoefficient);
+        dy = Math.round((y - lastY) / touchSensitivityCoefficient);
         if (!twisting || animating) { // whole cube rotation
             vNorm(vAdd(eye, vScale(vCopy(eyeD, eyeX), dx * -0.016)));
             vNorm(vMul(eyeX, eyeY, eye));
@@ -1734,35 +1603,5 @@ public final class AnimCube extends SurfaceView implements Runnable {
             currentAngle = 0.03 * (dragX * dx + dragY * dy) / Math.sqrt(dragX * dragX + dragY * dragY); // dv * cos a
         }
         repaint();
-    }
-
-    public void mouseMoved(MouseEvent e) {
-        int x = e.getX();
-        int y = e.getY();
-        String description = "Drag the cube with a mouse";
-        if (x >= 0 && x < width) {
-            if (y >= height && y < height + buttonHeight || y >= 0 && y < buttonHeight) {
-                buttonPressed = selectButton(x, y);
-                if (buttonPressed >= 0)
-                    description = buttonDescriptions[buttonPressed];
-                if (buttonPressed == 3 && !animating)
-                    description = "Mirror the cube view";
-            } else if (progressHeight > 0 && move.length > 0 && move[curMove].length > 0 && y >= height - progressHeight && y < height) {
-                description = "Current progress";
-            }
-        }
-        if (description != buttonDescription) {
-            buttonDescription = description;
-            showStatus(description);
-        }
-    }
-
-    public void mouseClicked(MouseEvent e) {
-    }
-
-    public void mouseEntered(MouseEvent e) {
-    }
-
-    public void mouseExited(MouseEvent e) {
     }
 }

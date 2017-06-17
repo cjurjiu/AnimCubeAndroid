@@ -23,11 +23,28 @@ public class Color {
         this.blue = blue;
     }
 
-    public int darker() {
-        return android.graphics.Color.rgb((int) (red * 0.6), (int) (green * 0.6), (int) (blue * 0.6));
+    public Color darker() {
+        return new Color((int) (red * 0.6), (int) (green * 0.6), (int) (blue * 0.6));
     }
 
-    public int brighter() {
-        return android.graphics.Color.rgb((int) (red * 1.4), (int) (green * 1.4), (int) (blue * 1.4));
+    public Color brighter() {
+        return new Color((int) (red * 1.4), (int) (green * 1.4), (int) (blue * 1.4));
     }
+
+//    public Color brighter() {
+//        return new Color((int) (red * 1.4), (int) (green * 1.4), (int) (blue * 1.4));
+//    }
+
+    public int getRed() {
+        return red;
+    }
+
+    public int getGreen() {
+        return green;
+    }
+
+    public int getBlue() {
+        return blue;
+    }
+
 }

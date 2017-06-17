@@ -4,12 +4,12 @@
         <attr name="backgroundColor" format="color|reference"/>
         <attr name="editable" format="boolean|reference"/>
         <attr name="backFacesDistance" format="integer|reference"/>
-        <attr name="gestureSensitivity" format="float|reference"/>
-        <attr name="initialPosition" format="string|reference"/>
+        <attr name="touchSensitivity" format="float|reference"/>
+        <attr name="initialRotation" format="string|reference"/>
         <attr name="perspective" format="integer|reference"/>
         <attr name="scale" format="integer|reference"/>
         <attr name="single_rotation_speed" format="integer|reference"/>
         <attr name="double_rotation_speed" format="integer|reference"/>
-        <attr name="align" format="string|reference"/>
+        <attr name="verticalAlign" format="string|reference"/>
     </declare-styleable>
 </resources>

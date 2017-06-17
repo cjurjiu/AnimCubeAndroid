@@ -137,7 +137,7 @@ public final class AnimCube extends SurfaceView implements Runnable,
     private boolean dragging;
     private int curMove;
     private boolean pushed;
-    private float touchSensitiviyCoefficient;
+    private float touchSensitivityCoefficient;
     private String initialColorValues;
 
     public AnimCube(Context context) {
@@ -212,8 +212,8 @@ public final class AnimCube extends SurfaceView implements Runnable,
         }
         int x = mirrored ? width - Math.round(e.getX()) : Math.round(e.getX());
         int y = Math.round(e.getY());
-        int dx = Math.round((x - lastX) / touchSensitiviyCoefficient);
-        int dy = Math.round((y - lastY) / touchSensitiviyCoefficient);
+        int dx = Math.round((x - lastX) / touchSensitivityCoefficient);
+        int dy = Math.round((y - lastY) / touchSensitivityCoefficient);
         if (editable && toTwist && !twisting && !animating) { // we do not twist
             // but we can
             lastDragX = x;
@@ -252,8 +252,8 @@ public final class AnimCube extends SurfaceView implements Runnable,
             lastY = lastDragY;
         }
 
-        dx = Math.round((x - lastX) / touchSensitiviyCoefficient);
-        dy = Math.round((y - lastY) / touchSensitiviyCoefficient);
+        dx = Math.round((x - lastX) / touchSensitivityCoefficient);
+        dy = Math.round((y - lastY) / touchSensitivityCoefficient);
         if (!twisting || animating) { // whole cube rotation
             CubeUtils.vNorm(CubeUtils.vAdd(eye, CubeUtils.vScale(CubeUtils.vCopy(eyeD, eyeX), dx * -0.016)));
             CubeUtils.vNorm(CubeUtils.vMul(eyeX, eyeY, eye));
@@ -356,11 +356,7 @@ public final class AnimCube extends SurfaceView implements Runnable,
             dragAreas = 0;
             if (natural) { // compact cube
                 fixBlock(canvas, eye, eyeX, eyeY, CubeConstants.cubeBlocks, 3); // draw
-                // cube
-                // and
-                // fill
-                // drag
-                // areas
+                // cube and fill drag areas
             } else { // in twisted state
                 // compute top observer
                 double cosA = Math.cos(originalAngle + currentAngle);
@@ -393,16 +389,8 @@ public final class AnimCube extends SurfaceView implements Runnable,
                     tempEyeX2[i] = 0;
                     for (int j = 0; j < 3; j++) {
                         int axis = twistedLayer / 2;
-                        tempEye2[i] += eye[j]
-                                * (CubeConstants.rotVec[axis][i][j]
-                                + CubeConstants.rotCos[axis][i][j]
-                                * cosB + CubeConstants.rotSin[axis][i][j]
-                                * sinB);
-                        tempEyeX2[i] += eyeX[j]
-                                * (CubeConstants.rotVec[axis][i][j]
-                                + CubeConstants.rotCos[axis][i][j]
-                                * cosB + CubeConstants.rotSin[axis][i][j]
-                                * sinB);
+                        tempEye2[i] += eye[j] * (CubeConstants.rotVec[axis][i][j] + CubeConstants.rotCos[axis][i][j] * cosB + CubeConstants.rotSin[axis][i][j] * sinB);
+                        tempEyeX2[i] += eyeX[j] * (CubeConstants.rotVec[axis][i][j] + CubeConstants.rotCos[axis][i][j] * cosB + CubeConstants.rotSin[axis][i][j] * sinB);
                     }
                 }
                 CubeUtils.vMul(tempEyeY2, tempEye2, tempEyeX2);
@@ -741,7 +729,7 @@ public final class AnimCube extends SurfaceView implements Runnable,
         if (touchSensitivityString.equals("Low")) {
             sensitivityCoeff = 0.5f;
         }
-        touchSensitiviyCoefficient = 5.0f * 1.0f / sensitivityCoeff;
+        touchSensitivityCoefficient = 5.0f * 1.0f / sensitivityCoeff;
     }
 
     public void setAnimationSpeed(String animationSpeedString) {
@@ -784,8 +772,8 @@ public final class AnimCube extends SurfaceView implements Runnable,
             editable = false;
         }
 
-        String initialPosition = CubeConstants.INITIAL_CUBE_POSITION;
-        styleableIndex = R.styleable.AnimCube_initialPosition;
+        String initialPosition = CubeConstants.DEFAULT_INITIAL_CUBE_ROTATION;
+        styleableIndex = R.styleable.AnimCube_initialRotation;
         if (attributes.hasValue(styleableIndex)) {
             initialPosition = attributes.getString(styleableIndex);
 
@@ -813,7 +801,7 @@ public final class AnimCube extends SurfaceView implements Runnable,
         }
 
         float sensitivityCoeff;
-        styleableIndex = R.styleable.AnimCube_gestureSensitivity;
+        styleableIndex = R.styleable.AnimCube_touchSensitivity;
         if (attributes.hasValue(styleableIndex)) {
             sensitivityCoeff = attributes.getFloat(styleableIndex, 1.0f);
         } else {
@@ -826,7 +814,7 @@ public final class AnimCube extends SurfaceView implements Runnable,
             sensitivityCoeff = 2f;
         }
 
-        touchSensitiviyCoefficient = 5.0f * 1.0f / sensitivityCoeff;
+        touchSensitivityCoefficient = 5.0f * 1.0f / sensitivityCoeff;
         int intscale;
         styleableIndex = R.styleable.AnimCube_scale;
         if (attributes.hasValue(styleableIndex)) {
@@ -843,7 +831,7 @@ public final class AnimCube extends SurfaceView implements Runnable,
             persp = 2;
         }
 
-        styleableIndex = R.styleable.AnimCube_align;
+        styleableIndex = R.styleable.AnimCube_verticalAlign;
         if (attributes.hasValue(styleableIndex)) {
             String alignParam = attributes.getString(styleableIndex);
             if (alignParam == null) {
@@ -1336,8 +1324,7 @@ public final class AnimCube extends SurfaceView implements Runnable,
 
                                 canvas.drawPath(path, paint);
                                 paint.setStyle(Paint.Style.STROKE);
-                                paint.setColor(colors[cube[i][p * 3 + q]]
-                                        .darker());
+                                paint.setColor(colors[cube[i][p * 3 + q]].darker().colorCode);
                                 canvas.drawPath(path, paint);
                             }
                         }
@@ -1434,7 +1421,7 @@ public final class AnimCube extends SurfaceView implements Runnable,
                                 getCorners(i, j, fillX, fillY, q
                                         + CubeConstants.border[j][0], p
                                         + CubeConstants.border[j][1], mirrored);
-                            paint.setColor(colors[cube[i][p * 3 + q]].darker());
+                            paint.setColor(colors[cube[i][p * 3 + q]].darker().colorCode);
 
                             path.reset();
                             path.moveTo(fillX[0], fillY[0]);

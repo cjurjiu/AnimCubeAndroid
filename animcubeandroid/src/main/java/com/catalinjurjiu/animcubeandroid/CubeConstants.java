@@ -200,7 +200,7 @@ public class CubeConstants {
     public static final int ANIMATION_FAST_FORWARD = 4; // fast forward
     public static final int ANIMATION_FAST_BACKWARD = 5;  // fast backward
 
-    public static final String INITIAL_CUBE_POSITION = "lluu";
+    public static final String DEFAULT_INITIAL_CUBE_ROTATION = "lluu";
     public static final String TOP_ALIGN = "top-align";
     public static final String CENTER_ALIGN = "center-align";
     public static final String BOTTOM_ALIGN = "bottom-align";
