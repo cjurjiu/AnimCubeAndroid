@@ -2,7 +2,35 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/menu_demo_moves"
-        android:title="Demo move"
+        android:id="@+id/start_moves"
+        android:title="Start moves"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/stop_moves"
+        android:title="Stop moves"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/one_move_forward"
+        android:title="1 Move Forward"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/one_move_backward"
+        android:title="1 Move Backward"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/reset_to_initial"
+        android:title="Reset to initial"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/freeze"
+        android:title="Freeze"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/save_state"
+        android:title="Save state"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/restore_state"
+        android:title="Restore state"
         app:showAsAction="never"/>
 </menu>

@@ -12,6 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:backFacesDistance="5"
-        app:editable="true"/>
+        app:editable="false"
+        app:moves="R2' U M U' R2' U M' U'"/>
 
 </FrameLayout>

@@ -211,7 +211,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
     };
     private float touchSensitivityCoefficient;
     private boolean mActionDownReceived;
-    private String initialColorValues;
 
     public AnimCube(Context context) {
         super(context);
@@ -243,8 +242,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
             return;
         }
 
-        this.initialColorValues = colorValues;
-
         for (int i = 0; i < 6; i++) {
             for (int j = 0; j < 9; j++) {
                 cube[i][j] = 23;
@@ -272,7 +269,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
     public void resetToInitialState() {
         stopAnimation();
         movePos = 0;
-        setCubeColors(initialColorValues);
+        resetCubeColors();
         repaint();
     }
 
@@ -733,6 +730,14 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         for (int i = 0; i < 6; i++) {
             for (int j = 0; j < 9; j++) {
                 cube[i][j] = i + 10;
+            }
+        }
+    }
+
+    private void resetCubeColors() {
+        for (int i = 0; i < 6; i++) {
+            for (int j = 0; j < 9; j++) {
+                cube[i][j] = initialCube[i][j];
             }
         }
     }
