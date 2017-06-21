@@ -365,9 +365,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
-        if (animating) {
-            return false;
-        }
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 mActionDownReceived = true;

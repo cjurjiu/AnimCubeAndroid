@@ -20,7 +20,7 @@
         android:layout_height="match_parent"
         app:backFacesDistance="5"
         app:debuggable="true"
-        app:editable="false"
+        app:editable="true"
         app:moves="R2' U M U' R2' U M' U'"/>
 
 </FrameLayout>
