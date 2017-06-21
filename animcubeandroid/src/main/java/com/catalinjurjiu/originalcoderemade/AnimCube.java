@@ -172,27 +172,26 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
      * CATA ADDED FIELDS
      **/
     private SurfaceHolder surfaceHolder;
-    private boolean surfaceCreated;
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private float touchSensitivityCoefficient;
     private boolean mActionDownReceived;
     private boolean isDebuggable;
     private Runnable paintRunnable = new Runnable() {
+
         @Override
         public void run() {
             LogUtil.d(TAG, "paintRunnable", isDebuggable);
-            synchronized (renderThreadLock) {
-                LogUtil.d(TAG, "paintRunnable: inside sync block", isDebuggable);
-                if (surfaceCreated) {
-                    LogUtil.d(TAG, "paintRunnable: surface IS created", isDebuggable);
-                    paint();
-                } else {
-                    LogUtil.d(TAG, "paintRunnable: surface IS NOT created", isDebuggable);
-                }
-                LogUtil.d(TAG, "paintRunnable: paint has finished, end of sync block", isDebuggable);
+            LogUtil.d(TAG, "paintRunnable: inside sync block", isDebuggable);
+            if (surfaceHolder != null && surfaceHolder.getSurface() != null && surfaceHolder.getSurface().isValid()) {
+                LogUtil.d(TAG, "paintRunnable: surface IS created", isDebuggable);
+                paint();
+            } else {
+                LogUtil.d(TAG, "paintRunnable: surface IS NOT created", isDebuggable);
             }
+            LogUtil.d(TAG, "paintRunnable: paint has finished, end of sync block", isDebuggable);
         }
     };
+    private boolean animThreadInactive;
     private Runnable animRunnable = new Runnable() {
         @Override
         public void run() {
@@ -203,8 +202,13 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         @Override
         public void surfaceCreated(SurfaceHolder holder) {
             LogUtil.d(TAG, "Surface Created", isDebuggable);
-            synchronized (renderThreadLock) {
-                surfaceCreated = true;
+            synchronized (animThreadLock) {
+                if (animThreadInactive || interrupted) {
+                    LogUtil.d(TAG, "AnimThread was either inactive or interrupted, recreate", isDebuggable);
+                    animThread.interrupt();
+                    animThread = new Thread(animRunnable);
+                    animThread.start();
+                }
             }
         }
 
@@ -217,10 +221,17 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         @Override
         public void surfaceDestroyed(SurfaceHolder holder) {
             LogUtil.d(TAG, "Surface surfaceDestroyed", isDebuggable);
-            synchronized (renderThreadLock) {
-                surfaceCreated = false;
-                renderHandler.removeCallbacks(paintRunnable);
+
+            LogUtil.d(TAG, "Surface surfaceDestroyed before animThreadLock", isDebuggable);
+            synchronized (animThreadLock) {
+                LogUtil.d(TAG, "surfaceDestroyed: in animThreadLock sync block", isDebuggable);
+                interrupted = true;
+                LogUtil.d(TAG, "surfaceDestroyed: end of animThreadLock sync block", isDebuggable);
             }
+
+            LogUtil.d(TAG, "Surface surfaceDestroyed before remove callbacks", isDebuggable);
+            renderHandler.removeCallbacks(paintRunnable);
+            LogUtil.d(TAG, "surfaceDestroyed: end", isDebuggable);
         }
     };
 
@@ -524,18 +535,33 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
     }
 
     private void paint() {
-        LogUtil.d(TAG, "repaint: paint canvas", isDebuggable);
-        synchronized (animThreadLock) {
-            LogUtil.d(TAG, "repaint: paint canvas synchronized", isDebuggable);
-            Canvas canvas = surfaceHolder.lockCanvas();
-            drawTheCanvas(canvas);
+        LogUtil.d(TAG, "paint: paint canvas", isDebuggable);
+
+        LogUtil.d(TAG, "paint: lock canvas", isDebuggable);
+        final Canvas canvas = surfaceHolder.lockCanvas();
+        LogUtil.d(TAG, "paint: after lock canvas: " + canvas, isDebuggable);
+        if (canvas != null) {
+            synchronized (animThreadLock) {
+                LogUtil.d(TAG, "paint: in sync block before drawTheCanvas", isDebuggable);
+                drawTheCanvas(canvas);
+                LogUtil.d(TAG, "paint: in sync block after drawTheCanvas", isDebuggable);
+            }
+
+            LogUtil.d(TAG, "paint: before unlock canvas: " + canvas, isDebuggable);
             surfaceHolder.unlockCanvasAndPost(canvas);
-            LogUtil.d(TAG, "repaint: paint has finished, end of sync block", isDebuggable);
+            LogUtil.d(TAG, "paint: after unlock canvas: " + canvas, isDebuggable);
+        } else {
+            LogUtil.d(TAG, "paint: do nothing, canvas is null.", isDebuggable);
         }
 
+        LogUtil.d(TAG, "paint: done", isDebuggable);
     }
 
-    private void drawTheCanvas(Canvas canvas) {
+    private void drawTheCanvas(final Canvas canvas) {
+        if (canvas == null) {
+            //null canvas, do nothing
+            return;
+        }
         paint.setColor(backgroundColor.colorCode);
         canvas.drawPaint(paint);
         int height = getHeight();
@@ -802,6 +828,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         synchronized (animThreadLock) {
             LogUtil.e(TAG, "animateCube acquired lock - sync block", isDebuggable);
             interrupted = false;
+            animThreadInactive = false;
             do {
                 if (restarted) {
                     LogUtil.e(TAG, "animateCube notify at restarted check", isDebuggable);
@@ -813,6 +840,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
                     animThreadLock.wait();
                     LogUtil.e(TAG, "animateCube: after wait - got lock - ok", isDebuggable);
                 } catch (InterruptedException e) {
+                    interrupted = true;
                     LogUtil.e(TAG, "animateCube: after wait, interrupted exception:" + e.getMessage(), e, isDebuggable);
                     break;
                 }
@@ -837,8 +865,15 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
                     }
                     if (mv[movePos] == -1) {
                         repaint();
-                        if (!moveOne)
+                        if (!moveOne) {
+                            LogUtil.e(TAG, "animateCube: before sleep 33 * speed", isDebuggable);
                             sleep(33 * speed);
+                            LogUtil.e(TAG, "animateCube: after sleep 33 * speed", isDebuggable);
+                            if (interrupted || restarted) {
+                                LogUtil.e(TAG, "animateCube: interrupted", isDebuggable);
+                                break;
+                            }
+                        }
                     } else if (mv[movePos] < 1000) {
                         int num = mv[movePos] % 4 + 1;
                         int mode = mv[movePos] / 4 % 6;
@@ -849,7 +884,9 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
                             clockwise = !clockwise;
                             num = 4 - num;
                         }
+                        LogUtil.e(TAG, "animateCube: spin", isDebuggable);
                         spin(mv[movePos] / 24, num, mode, clockwise, moveAnimated);
+                        LogUtil.e(TAG, "animateCube: after spin", isDebuggable);
                         if (moveOne)
                             restart = true;
                     }
@@ -862,12 +899,15 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
                             break;
                         }
                     }
-                    if (interrupted || restarted || restart)
+                    if (interrupted || restarted || restart) {
+                        LogUtil.e(TAG, "animateCube: thread interrupted", isDebuggable);
                         break;
+                    }
                 }
                 animating = false;
                 repaint();
             } while (!interrupted);
+            animThreadInactive = true;
         }
         LogUtil.e(TAG, "Animate cube: Interrupted, all is fine, ended!", isDebuggable);
     } // run()
