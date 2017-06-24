@@ -8,11 +8,11 @@
     tools:context="com.catalinjujiu.testrubikrenderer.MainActivity">
 
     <!--<com.catalinjurjiu.animcubeandroid.AnimCube-->
-        <!--android:id="@+id/animcube"-->
-        <!--android:layout_width="match_parent"-->
-        <!--android:layout_height="match_parent"-->
-        <!--app:backFacesDistance="5"-->
-        <!--app:editable="false"/>-->
+    <!--android:id="@+id/animcube"-->
+    <!--android:layout_width="match_parent"-->
+    <!--android:layout_height="match_parent"-->
+    <!--app:backFacesDistance="5"-->
+    <!--app:editable="false"/>-->
 
     <com.catalinjurjiu.originalcoderemade.AnimCube
         android:id="@+id/animcube"
@@ -21,6 +21,7 @@
         app:backFacesDistance="5"
         app:debuggable="true"
         app:editable="true"
-        app:moves="R2' U M U' R2' U M' U'"/>
+        app:moves="R2' U M U' R2' U M' U'"
+        app:single_rotation_speed="20"/>
 
 </FrameLayout>

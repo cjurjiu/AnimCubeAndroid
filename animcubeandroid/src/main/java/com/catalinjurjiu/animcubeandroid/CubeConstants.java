@@ -193,6 +193,7 @@ public class CubeConstants {
     public static final int[][] blockMode = {{0, 2, 2}, {2, 1, 2}, {2, 2, 2}, {2, 2, 2}, {2, 2, 2}, {2, 2, 2}};
     public static final int[][] drawOrder = {{0, 1, 2}, {2, 1, 0}, {0, 2, 1}};
 
+    public static final int ANIMATION_INVALID_VALUE = -1; // INVALID
     public static final int ANIMATION_PLAY_FORWARD = 0; // play forward
     public static final int ANIMATION_PLAY_BACKWARD = 1; // play backward
     public static final int ANIMATION_STEP_FORWARD = 2; // step forward
