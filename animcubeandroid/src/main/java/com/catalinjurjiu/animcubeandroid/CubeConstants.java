@@ -53,16 +53,6 @@ public class CubeConstants {
     };
     // directions of facelet cycling for all faces
     public static final int[] faceTwistDirs = {1, 1, -1, -1, -1, -1};
-    // transformation tables for compatibility with Lars's applet
-    public static final int[] posFaceTransform = {3, 2, 0, 5, 1, 4};
-    public static final int[][] posFaceletTransform = {
-            {6, 3, 0, 7, 4, 1, 8, 5, 2}, // B +27
-            {2, 5, 8, 1, 4, 7, 0, 3, 6}, // F +18
-            {0, 1, 2, 3, 4, 5, 6, 7, 8}, // U +0
-            {0, 1, 2, 3, 4, 5, 6, 7, 8}, // R +45
-            {6, 3, 0, 7, 4, 1, 8, 5, 2}, // D +9
-            {0, 1, 2, 3, 4, 5, 6, 7, 8}  // L +36
-    };
     public static final int[] moveModes = {
             0, 0, 0, 0, 0, 0, // UDFBLR
             1, 1, 1,          // ESM
@@ -202,47 +192,7 @@ public class CubeConstants {
     public static final int ANIMATION_FAST_BACKWARD = 5;  // fast backward
 
     public static final String DEFAULT_INITIAL_CUBE_ROTATION = "lluu";
-    public static final String TOP_ALIGN = "top-align";
-    public static final String CENTER_ALIGN = "center-align";
-    public static final String BOTTOM_ALIGN = "bottom-align";
-
-    /**
-     * MAYBE WILL KEEP MAYBE NOT
-     */
-    public static final String[][][] turnSymbol = {
-            { // "standard" notation
-                    {"U", "D", "F", "B", "L", "R"},
-                    {"Um", "Dm", "Fm", "Bm", "Lm", "Rm"},
-                    {"Ut", "Dt", "Ft", "Bt", "Lt", "Rt"},
-                    {"Uc", "Dc", "Fc", "Bc", "Lc", "Rc"},
-                    {"Us", "Ds", "Fs", "Bs", "Ls", "Rs"},
-                    {"Ua", "Da", "Fa", "Ba", "La", "Ra"}
-            },
-            { // "reduced" notation
-                    {"U", "D", "F", "B", "L", "R"},
-                    {"~E", "E", "S", "~S", "M", "~M"},
-                    {"u", "d", "f", "b", "l", "r"},
-                    {"Z", "~Z", "Y", "~Y", "~X", "X"},
-                    {"Us", "Ds", "Fs", "Bs", "Ls", "Rs"},
-                    {"Ua", "Da", "Fa", "Ba", "La", "Ra"}
-            },
-            { // "reduced" notation - swapped Y and Z
-                    {"U", "D", "F", "B", "L", "R"},
-                    {"~E", "E", "S", "~S", "M", "~M"},
-                    {"u", "d", "f", "b", "l", "r"},
-                    {"Y", "~Y", "Z", "~Z", "~X", "X"},
-                    {"Us", "Ds", "Fs", "Bs", "Ls", "Rs"},
-                    {"Ua", "Da", "Fa", "Ba", "La", "Ra"}
-            },
-            { // another reduced notation
-                    {"U", "D", "F", "B", "L", "R"},
-                    {"u", "d", "f", "b", "l", "r"},
-                    {"Uu", "Dd", "Ff", "Bb", "Ll", "Rr"},
-                    {"QU", "QD", "QF", "QB", "QL", "QR"},
-                    {"UD'", "DU'", "FB'", "BF'", "LR'", "RL'"},
-                    {"UD", "DU", "FB", "BF", "LR", "RL"}
-            }
-    };
-    public static final String[] modifierStrings = {"", "2", "'", "2'"};
-    private static final String[] metricChar = {"", "q", "f", "s"};
+    public static final String TOP_ALIGN = "top";
+    public static final String CENTER_ALIGN = "center";
+    public static final String BOTTOM_ALIGN = "bottom";
 }

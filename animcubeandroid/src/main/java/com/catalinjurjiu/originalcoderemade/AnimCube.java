@@ -126,7 +126,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
     private final double[] eyeD = new double[3];
     private final Path path = new Path();
     private final Object animThreadLock = new Object(); // lock object for the animation thread
-    private final Object renderThreadLock = new Object();
     // background colors
     private Color backgroundColor;
     private Color backgroundColor2;
@@ -178,7 +177,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
     // current drag directions
     private double dragX;
     private double dragY;
-    private RenderThread renderThread;
     private Thread animThread; // thread to perform the animation
     /**
      * CATA ADDED FIELDS
@@ -200,16 +198,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         public void surfaceCreated(SurfaceHolder holder) {
             LogUtil.d(TAG, "Surface Created", isDebuggable);
             synchronized (animThreadLock) {
-                if (renderThread.hasFinished()) {
-                    LogUtil.d(TAG, "RenderThread was either inactive or interrupted, recreate", isDebuggable);
-                    renderThread.interrupt();
-                    renderThread = new RenderThread();
-                    renderThread.surfaceHolder = getHolder();
-                    renderThread.animCube = AnimCube.this;
-                    renderThread.isDebuggable = isDebuggable;
-                    renderThread.start();
-                }
-
                 if (animThreadInactive || interrupted) {
                     LogUtil.d(TAG, "AnimThread was either inactive or interrupted, recreate", isDebuggable);
                     animThread.interrupt();
@@ -281,17 +269,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         }
 
         LogUtil.w(TAG, "stopAnimationAndDrawing BEFORE requestShutdown.", isDebuggable);
-        renderThread.requestShutdown();
-        LogUtil.w(TAG, "stopAnimationAndDrawing calling JOIN on RenderThread.", isDebuggable);
-        if (renderThread.isAlive()) {
-            renderThread.interrupt();
-            try {
-                renderThread.join();
-            } catch (InterruptedException e) {
-                LogUtil.d(TAG, "interrupted while waiting for RenderThread to finish", isDebuggable);
-            }
-            LogUtil.w(TAG, "stopAnimationAndDrawing AFTER requestShutdown.", isDebuggable);
-        }
     }
 
     /**
@@ -428,22 +405,27 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
+        synchronized (animThreadLock) {
+            if (animating) {
+                return false;
+            }
+        }
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 mActionDownReceived = true;
                 handlePointerDownEvent(event);
-                break;
+                return true;
             case MotionEvent.ACTION_UP:
                 if (mActionDownReceived) {
                     handlePointerUpEvent();
                     mActionDownReceived = false;
                 }
-                break;
+                return true;
             case MotionEvent.ACTION_MOVE:
                 handlePointerDragEvent(event);
-                break;
+                return true;
         }
-        return true;
+        return false;
     }
 
     private void init(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
@@ -466,20 +448,25 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         //done, recycle typed array
         attributes.recycle();
 
-        // get the surface holder of he current surface view, add this view as a
-        // callback
-        getHolder().addCallback(surfaceCallback);
-        renderThread = new RenderThread();
-        renderThread.surfaceHolder = getHolder();
-        renderThread.animCube = this;
-        renderThread.isDebuggable = isDebuggable;
-        renderThread.start();
-        animThread = new Thread(animRunnable, "AnimThread");
-        // start animation thread
-        animThread.start();
+        if (!isInEditMode()) {
+            // get the surface holder of he current surface view, add this view as a
+            // callback
+            getHolder().addCallback(surfaceCallback);
+            animThread = new Thread(animRunnable, "AnimThread");
+            // start animation thread
+            animThread.start();
 
-        // register to receive touch events
-        setOnTouchListener(this);
+            // register to receive touch events
+            setOnTouchListener(this);
+        }
+    }
+
+    @Override
+    public void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        if (isInEditMode()) {
+            performDraw(canvas);
+        }
     }
 
     private void initDebuggable(TypedArray attributes) {
@@ -595,105 +582,114 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         this.doubleSpeed = attributes.getInt(R.styleable.AnimCube_double_rotation_speed, this.speed * 3 / 2);
     }
 
-    void customPaint(Canvas canvas) {
-        LogUtil.d(TAG, "customPaint: customPaint canvas", isDebuggable);
-//      synchronized (animThreadLock) {
-        LogUtil.d(TAG, "customPaint: in sync block before drawTheCanvas", isDebuggable);
-        drawTheCanvas(canvas);
-        LogUtil.d(TAG, "customPaint: in sync block after drawTheCanvas", isDebuggable);
-//        }
-        LogUtil.d(TAG, "customPaint: done", isDebuggable);
-    }
-
-    private void drawTheCanvas(final Canvas canvas) {
-
-        paint.setColor(backgroundColor.colorCode);
-        canvas.drawPaint(paint);
-        int height = getHeight();
-        int width = getWidth();
-        // create offscreen buffer for double buffering
-        if (width != this.width || height != this.height) {
-            this.width = width;
-            this.height = height;
-        }
-
-        dragAreas = 0;
-        if (natural) // compact cube
-            fixBlock(canvas, eye, eyeX, eyeY, cubeBlocks, 3); // draw cube and fill drag areas
-        else { // in twisted state
-            // compute top observer
-            double cosA = Math.cos(originalAngle + currentAngle);
-            double sinA = Math.sin(originalAngle + currentAngle) * rotSign[twistedLayer];
-            for (int i = 0; i < 3; i++) {
-                tempEye[i] = 0;
-                tempEyeX[i] = 0;
-                for (int j = 0; j < 3; j++) {
-                    int axis = twistedLayer / 2;
-                    tempEye[i] += eye[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosA + rotSin[axis][i][j] * sinA);
-                    tempEyeX[i] += eyeX[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosA + rotSin[axis][i][j] * sinA);
-                }
+    void performDraw(Canvas canvas) {
+        LogUtil.d(TAG, "performDraw: canvas", isDebuggable);
+        synchronized (animThreadLock) {
+            LogUtil.d(TAG, "performDraw: START Sync block", isDebuggable);
+            paint.setColor(backgroundColor.colorCode);
+            if (isInEditMode()) {
+                //Canvas.drawPaint is not supported in editMode...
+                canvas.drawRect(0, 0, 100000, 100000, paint);
+            } else {
+                canvas.drawPaint(paint);
             }
-            vMul(tempEyeY, tempEye, tempEyeX);
-            // compute bottom anti-observer
-            double cosB = Math.cos(originalAngle - currentAngle);
-            double sinB = Math.sin(originalAngle - currentAngle) * rotSign[twistedLayer];
-            for (int i = 0; i < 3; i++) {
-                tempEye2[i] = 0;
-                tempEyeX2[i] = 0;
-                for (int j = 0; j < 3; j++) {
-                    int axis = twistedLayer / 2;
-                    tempEye2[i] += eye[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosB + rotSin[axis][i][j] * sinB);
-                    tempEyeX2[i] += eyeX[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosB + rotSin[axis][i][j] * sinB);
-                }
+            int height = getHeight();
+            int width = getWidth();
+            // create offscreen buffer for double buffering
+            if (width != this.width || height != this.height) {
+                this.width = width;
+                this.height = height;
             }
-            vMul(tempEyeY2, tempEye2, tempEyeX2);
-            eyeArray[0] = eye;
-            eyeArrayX[0] = eyeX;
-            eyeArrayY[0] = eyeY;
-            eyeArray[1] = tempEye;
-            eyeArrayX[1] = tempEyeX;
-            eyeArrayY[1] = tempEyeY;
-            eyeArray[2] = tempEye2;
-            eyeArrayX[2] = tempEyeX2;
-            eyeArrayY[2] = tempEyeY2;
-            blockArray[0] = topBlocks;
-            blockArray[1] = midBlocks;
-            blockArray[2] = botBlocks;
-            // perspective corrections
-            vSub(vScale(vCopy(perspEye, eye), 5.0 + perspective), vScale(vCopy(perspNormal, faceNormals[twistedLayer]), 1.0 / 3.0));
-            vSub(vScale(vCopy(perspEyeI, eye), 5.0 + perspective), vScale(vCopy(perspNormal, faceNormals[twistedLayer ^ 1]), 1.0 / 3.0));
-            double topProd = vProd(perspEye, faceNormals[twistedLayer]);
-            double botProd = vProd(perspEyeI, faceNormals[twistedLayer ^ 1]);
-            int orderMode;
-            if (topProd < 0 && botProd > 0) // top facing away
-                orderMode = 0;
-            else if (topProd > 0 && botProd < 0) // bottom facing away: draw it first
-                orderMode = 1;
-            else // both top and bottom layer facing away: draw them first
-                orderMode = 2;
-            fixBlock(canvas,
-                    eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
-                    eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
-                    eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
-                    blockArray[CubeUtils.drawOrder[orderMode][0]],
-                    CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][0]]);
-            fixBlock(canvas,
-                    eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
-                    eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
-                    eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
-                    blockArray[CubeUtils.drawOrder[orderMode][1]],
-                    CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][1]]);
-            fixBlock(canvas,
-                    eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
-                    eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
-                    eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
-                    blockArray[CubeUtils.drawOrder[orderMode][2]],
-                    CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][2]]);
+
+            dragAreas = 0;
+            if (natural) { // compact cube
+                LogUtil.d(TAG, "performDraw: compact cube", isDebuggable);
+                fixBlock(canvas, eye, eyeX, eyeY, cubeBlocks, 3); // draw cube and fill drag areas
+            } else { // in twisted state
+                LogUtil.d(TAG, "performDraw: in twisted state", isDebuggable);
+                // compute top observer
+                double cosA = Math.cos(originalAngle + currentAngle);
+                double sinA = Math.sin(originalAngle + currentAngle) * rotSign[twistedLayer];
+                for (int i = 0; i < 3; i++) {
+                    tempEye[i] = 0;
+                    tempEyeX[i] = 0;
+                    for (int j = 0; j < 3; j++) {
+                        int axis = twistedLayer / 2;
+                        tempEye[i] += eye[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosA + rotSin[axis][i][j] * sinA);
+                        tempEyeX[i] += eyeX[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosA + rotSin[axis][i][j] * sinA);
+                    }
+                }
+                vMul(tempEyeY, tempEye, tempEyeX);
+                // compute bottom anti-observer
+                double cosB = Math.cos(originalAngle - currentAngle);
+                double sinB = Math.sin(originalAngle - currentAngle) * rotSign[twistedLayer];
+                for (int i = 0; i < 3; i++) {
+                    tempEye2[i] = 0;
+                    tempEyeX2[i] = 0;
+                    for (int j = 0; j < 3; j++) {
+                        int axis = twistedLayer / 2;
+                        tempEye2[i] += eye[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosB + rotSin[axis][i][j] * sinB);
+                        tempEyeX2[i] += eyeX[j] * (rotVec[axis][i][j] + rotCos[axis][i][j] * cosB + rotSin[axis][i][j] * sinB);
+                    }
+                }
+                vMul(tempEyeY2, tempEye2, tempEyeX2);
+                eyeArray[0] = eye;
+                eyeArrayX[0] = eyeX;
+                eyeArrayY[0] = eyeY;
+                eyeArray[1] = tempEye;
+                eyeArrayX[1] = tempEyeX;
+                eyeArrayY[1] = tempEyeY;
+                eyeArray[2] = tempEye2;
+                eyeArrayX[2] = tempEyeX2;
+                eyeArrayY[2] = tempEyeY2;
+                blockArray[0] = topBlocks;
+                blockArray[1] = midBlocks;
+                blockArray[2] = botBlocks;
+                // perspective corrections
+                vSub(vScale(vCopy(perspEye, eye), 5.0 + perspective), vScale(vCopy(perspNormal, faceNormals[twistedLayer]), 1.0 / 3.0));
+                vSub(vScale(vCopy(perspEyeI, eye), 5.0 + perspective), vScale(vCopy(perspNormal, faceNormals[twistedLayer ^ 1]), 1.0 / 3.0));
+                double topProd = vProd(perspEye, faceNormals[twistedLayer]);
+                double botProd = vProd(perspEyeI, faceNormals[twistedLayer ^ 1]);
+                int orderMode;
+                if (topProd < 0 && botProd > 0) // top facing away
+                    orderMode = 0;
+                else if (topProd > 0 && botProd < 0) // bottom facing away: draw it first
+                    orderMode = 1;
+                else // both top and bottom layer facing away: draw them first
+                    orderMode = 2;
+                fixBlock(canvas,
+                        eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
+                        eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
+                        eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
+                        blockArray[CubeUtils.drawOrder[orderMode][0]],
+                        CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][0]]);
+                fixBlock(canvas,
+                        eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
+                        eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
+                        eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
+                        blockArray[CubeUtils.drawOrder[orderMode][1]],
+                        CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][1]]);
+                fixBlock(canvas,
+                        eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
+                        eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
+                        eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
+                        blockArray[CubeUtils.drawOrder[orderMode][2]],
+                        CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][2]]);
+            }
+            LogUtil.d(TAG, "performDraw: done end of sync block", isDebuggable);
         }
+        LogUtil.d(TAG, "performDraw: done", isDebuggable);
     }
 
     private void repaint() {
-        renderThread.requestPaint();
+        LogUtil.e(TAG, "#rePaint()", isDebuggable);
+        synchronized (animThreadLock) {
+            Canvas c = getHolder().lockCanvas();
+            if (c != null) {
+                performDraw(c);
+                getHolder().unlockCanvasAndPost(c);
+            }
+        }
     }
 
     private int[][] getMove(String sequence, boolean info) {
@@ -886,7 +882,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
                     LogUtil.e(TAG, "animateCube: after wait - got lock - ok", isDebuggable);
                 } catch (InterruptedException e) {
                     interrupted = true;
-                    LogUtil.e(TAG, "animateCube: after wait, interrupted exception:" + e.getMessage(), e, isDebuggable);
+                    LogUtil.e(TAG, "animateCube: after wait, interrupted exception:" + e.getMessage(), isDebuggable);
                     break;
                 }
                 if (restarted)
@@ -951,6 +947,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
                 }
                 animating = false;
                 animationMode = ANIMATION_INVALID_VALUE;
+                LogUtil.d(TAG, "animateCube: repaint at end of loop", isDebuggable);
                 repaint();
             } while (!interrupted);
             animThreadInactive = true;
@@ -1012,10 +1009,13 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
             long lTime = sTime;
             double d = phis * phit / turnTime;
             for (currentAngle = 0; currentAngle * phis < phit; currentAngle = d * (lTime - sTime)) {
+                LogUtil.d(TAG, "spin: repaint in spin angle loop", isDebuggable);
                 repaint();
-                sleep(25);
-                if (interrupted || restarted)
+                sleep(1);
+                if (interrupted || restarted) {
+                    LogUtil.d(TAG, "spin: interrupted or restarted in spin, break;", isDebuggable);
                     break;
+                }
                 lTime = System.currentTimeMillis();
             }
         }
@@ -1025,8 +1025,11 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         twistLayers(cube, layer, num, mode);
         LogUtil.e(TAG, "Updated Cube Model -> twistLayers in spin", isDebuggable);
         spinning = false;
-        if (animated && (!interrupted || !restarted))
+        if (animated) {
+            //TODO         if (animated && (!interrupted || !restarted))
+            LogUtil.e(TAG, "Updated Cube Model -> is animated, request repaint", isDebuggable);
             repaint();
+        }
     }
 
     private void splitCube(int layer) {
@@ -1039,6 +1042,8 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
     }
 
     private void twistLayers(int[][] cube, int layer, int num, int mode) {
+        LogUtil.e(TAG, "twistLayers", isDebuggable);
+
         switch (mode) {
             case 3:
                 twistLayer(cube, layer ^ 1, num, false);

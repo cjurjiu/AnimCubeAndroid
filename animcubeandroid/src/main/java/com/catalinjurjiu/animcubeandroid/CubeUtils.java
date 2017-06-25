@@ -6,17 +6,6 @@ package com.catalinjurjiu.animcubeandroid;
 
 public class CubeUtils {
 
-    // status bar help strings
-    public static final String[] buttonDescriptions = {
-            "Clear to the initial state",
-            "Show the previous step",
-            "Play backward",
-            "Stop",
-            "Play",
-            "Show the next step",
-            "Go to the end",
-            "Next sequence"
-    };
     // cube colors
     public static final Color[] colors = {
             new Color(255, 128, 64),   // 0 - light orange

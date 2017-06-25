@@ -20,7 +20,6 @@ public class RenderThread extends Thread {
     private boolean interrupted = false;
     private boolean interruptRequestConsumed = false;
     private boolean initComplete = false;
-    private Object someLock = new Object();
     private boolean paintRequestWhileInitNotComplete;
 
 
@@ -73,7 +72,7 @@ public class RenderThread extends Thread {
                         LogUtil.d(TAG, "RenderThread#run after lock canvas", isDebuggable);
                         if (canvas != null) {
                             LogUtil.d(TAG, "RenderThread#run CANVAS NOT NULL", isDebuggable);
-                            animCube.customPaint(canvas);
+                            animCube.performDraw(canvas);
                             LogUtil.d(TAG, "RenderThread#run after paint canvas", isDebuggable);
                             surfaceHolder.unlockCanvasAndPost(canvas);
                             LogUtil.d(TAG, "RenderThread#run after unlock and post canvas. FINISH", isDebuggable);

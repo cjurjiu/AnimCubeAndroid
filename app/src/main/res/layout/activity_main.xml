@@ -18,10 +18,11 @@
         android:id="@+id/animcube"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:backFacesDistance="5"
+        app:backFacesDistance="4"
         app:debuggable="true"
+        app:scale="10"
         app:editable="true"
         app:moves="R2' U M U' R2' U M' U'"
-        app:single_rotation_speed="20"/>
+        app:single_rotation_speed="5"/>
 
 </FrameLayout>
