@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <array name="test_custom_cube_colors">
+        <item>#000000</item>
+        <item>#ff00c8</item>
+        <item>#20ffbc</item>
+        <item>#d04900</item>
+        <item>#009032</item>
+        <item>#6320d0</item>
+    </array>
+
+    <array name="test_custom_cube_colors2">
+        <item>#ce3232</item>
+        <item>#d764be</item>
+        <item>#b9bed6</item>
+        <item>#d9ff00</item>
+        <item>#00290b</item>
+        <item>#090778</item>
+    </array>
+</resources>

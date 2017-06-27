@@ -2,6 +2,7 @@ package com.catalinjujiu.testrubikrenderer;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
@@ -10,7 +11,7 @@ import com.catalinjurjiu.animcubeandroid.CubeConstants;
 import com.catalinjurjiu.animcubeandroid.LogUtil;
 import com.catalinjurjiu.originalcoderemade.AnimCube;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements AnimCube.CubeModelUpdatedListener {
 
     public static final String ANIM_CUBE_SAVE_STATE_BUNDLE_ID = "animCube";
     private static final String TAG = "AnimCubeActivity";
@@ -24,6 +25,7 @@ public class MainActivity extends Activity {
         setContentView(R.layout.activity_main);
         animCube = (AnimCube) findViewById(R.id.animcube);
         animCube.setMoveSequence("R2' U M U' R2' U M' U'");
+        animCube.setCubeModelUpdatedListener(this);
     }
 
     @Override
@@ -85,5 +87,27 @@ public class MainActivity extends Activity {
         LogUtil.d(TAG, "onDestroy", true);
         animCube.cleanUpResources();
         LogUtil.d(TAG, "onDestroy: finish", true);
+    }
+
+    @Override
+    public void onCubeModelUpdate() {
+        Log.d("Cata", "Cube model updated. New model:");
+        int[][] cube = animCube.getCubeModel();
+        StringBuilder stringBuilder = new StringBuilder("");
+        for (int i = 0; i < cube.length; i++) {
+            stringBuilder.append("\n");
+            stringBuilder.append(i);
+            stringBuilder.append(":\n");
+            for (int j = 0; j < cube[i].length; j++) {
+                stringBuilder.append(" ");
+                stringBuilder.append(cube[i][j]);
+                if ((j + 1) % 3 == 0) {
+                    stringBuilder.append("\n");
+                } else {
+                    stringBuilder.append(", ");
+                }
+            }
+        }
+        Log.d("Cata", stringBuilder.toString());
     }
 }

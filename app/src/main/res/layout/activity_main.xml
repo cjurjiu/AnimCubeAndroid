@@ -7,20 +7,13 @@
     android:layout_height="match_parent"
     tools:context="com.catalinjujiu.testrubikrenderer.MainActivity">
 
-    <!--<com.catalinjurjiu.animcubeandroid.AnimCube-->
-    <!--android:id="@+id/animcube"-->
-    <!--android:layout_width="match_parent"-->
-    <!--android:layout_height="match_parent"-->
-    <!--app:backFacesDistance="5"-->
-    <!--app:editable="false"/>-->
-
     <com.catalinjurjiu.originalcoderemade.AnimCube
         android:id="@+id/animcube"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         app:backFacesDistance="4"
+        app:backgroundColor="#d0d0d0"
         app:debuggable="true"
-        app:scale="10"
         app:editable="true"
         app:moves="R2' U M U' R2' U M' U'"
         app:single_rotation_speed="5"/>

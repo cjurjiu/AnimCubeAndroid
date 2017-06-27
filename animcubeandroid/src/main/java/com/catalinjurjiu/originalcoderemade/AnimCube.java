@@ -3,6 +3,7 @@ package com.catalinjurjiu.originalcoderemade;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.os.Bundle;
@@ -12,7 +13,6 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 
-import com.catalinjurjiu.animcubeandroid.Color;
 import com.catalinjurjiu.animcubeandroid.CubeConstants;
 import com.catalinjurjiu.animcubeandroid.CubeUtils;
 import com.catalinjurjiu.animcubeandroid.LogUtil;
@@ -47,9 +47,7 @@ import static com.catalinjurjiu.animcubeandroid.CubeConstants.rotVec;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.topBlockFaceDim;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.topBlockTable;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.twistDirs;
-import static com.catalinjurjiu.animcubeandroid.CubeUtils.arrayMovePos;
-import static com.catalinjurjiu.animcubeandroid.CubeUtils.colors;
-import static com.catalinjurjiu.animcubeandroid.CubeUtils.realMoveLength;
+import static com.catalinjurjiu.animcubeandroid.CubeUtils.darkerColor;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.vAdd;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.vCopy;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.vMul;
@@ -124,9 +122,11 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     private final double[] eyeD = new double[3];
     private final Path path = new Path();
     private final Object animThreadLock = new Object(); // lock object for the animation thread
+    private final int[] cubeColors = new int[6];
     // background colors
-    private Color backgroundColor;
-    private Color backgroundColor2;
+    private int backgroundColor;
+    private int backgroundColor2;
+    private int faceletsContourColor;
     // current twisted layer
     private int twistedLayer;
     private int twistedMode;
@@ -146,7 +146,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     private boolean twisting; // a user twists a cube layer
     private boolean spinning; // an animation twists a cube layer
     private boolean animating; // animation run
-    private boolean dragging; // progress bar is controlled
     private int perspective; // perspective deformation
     private double scale; // cube scale
     private int align; // cube alignment (top, center, bottom)
@@ -185,6 +184,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     private boolean isDebuggable;
     private boolean animThreadInactive;
     private int animationMode = -1;
+    private CubeModelUpdatedListener cubeModelUpdatedListener;
     private Runnable animRunnable = new Runnable() {
         @Override
         public void run() {
@@ -283,7 +283,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     /**
      * @param colorValues
      */
-    public void setCubeColors(String colorValues) {
+    public void setCubeInCustomState(String colorValues) {
         // setup color facelets
         if (colorValues.length() != 54) {
             return;
@@ -291,10 +291,8 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
 
         for (int i = 0; i < 6; i++) {
             for (int j = 0; j < 9; j++) {
-                cube[i][j] = 23;
-                for (int k = 0; k < 23; k++) {
-                    if (Character.toLowerCase(colorValues.charAt(i * 9 + j)) == "0123456789wyorgbldmcpnk"
-                            .charAt(k)) {
+                for (int k = CubeConstants.CubeColors.WHITE; k < CubeConstants.CubeColors.BLUE + 1; k++) {
+                    if (Integer.parseInt(colorValues.charAt(i * 9 + j) + "") == k) {
                         cube[i][j] = k;
                         break;
                     }
@@ -481,6 +479,8 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
 
         initBackgroundColor(attributes);
         initCubeColors(attributes);
+        initFaceletsContourColor(attributes);
+        initCubeInitialState(attributes);
         initMoves(attributes);
         initEditable(attributes);
         initInitialRotation(attributes);
@@ -494,6 +494,8 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         initDebuggable(attributes);
         //done, recycle typed array
         attributes.recycle();
+
+        paint.setAntiAlias(true);
 
         if (!isInEditMode()) {
             // get the surface holder of he current surface view, add this view as a
@@ -513,18 +515,39 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     }
 
     private void initBackgroundColor(TypedArray attributes) {
-        this.backgroundColor = new Color(attributes.getColor(R.styleable.AnimCube_backgroundColor,
-                android.graphics.Color.WHITE));
+        this.backgroundColor = attributes.getColor(R.styleable.AnimCube_backgroundColor,
+                android.graphics.Color.WHITE);
         // setup colors (contrast)
-        this.backgroundColor2 = new Color(backgroundColor.red / 2, backgroundColor.green / 2, backgroundColor.blue / 2);
+        this.backgroundColor2 = Color.rgb(Color.red(backgroundColor) / 2, Color.green(backgroundColor) / 2, Color.blue(backgroundColor) / 2);
     }
 
     private void initCubeColors(TypedArray attributes) {
-        String cubeColorsString = attributes.getString(R.styleable.AnimCube_cubeColors);
-        if (cubeColorsString == null || cubeColorsString.length() != 54) {
-            setCubeDefaultColors();
+        int colorsResourceId = attributes.getResourceId(R.styleable.AnimCube_cubeColors, R.array.cube_default_colors);
+        if (isInEditMode()) {
+            String[] s = getResources().getStringArray(colorsResourceId);
+            for (int j = 0; j < s.length; j++) {
+                cubeColors[j] = Color.parseColor(s[j]);
+            }
         } else {
-            setCubeColors(cubeColorsString);
+            TypedArray typedArray = getResources().obtainTypedArray(colorsResourceId);
+            for (int i = 0; i < 6; i++) {
+                cubeColors[i] = typedArray.getColor(i, 0);
+            }
+            typedArray.recycle();
+        }
+    }
+
+    private void initFaceletsContourColor(TypedArray attributes) {
+        this.faceletsContourColor = attributes.getColor(R.styleable.AnimCube_faceletsContourColor,
+                Color.BLACK);
+    }
+
+    private void initCubeInitialState(TypedArray attributes) {
+        String cubeColorsString = attributes.getString(R.styleable.AnimCube_initialState);
+        if (cubeColorsString == null || cubeColorsString.length() != 54) {
+            setCubeInDefaultState();
+        } else {
+            setCubeInCustomState(cubeColorsString);
         }
         // setup initial values
         for (int i = 0; i < 6; i++) {
@@ -601,12 +624,16 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             if (alignParam == null) {
                 align = 1;
             } else {
-                if (CubeConstants.TOP_ALIGN.equals(alignParam)) // top
+                if (CubeConstants.TOP_ALIGN.equals(alignParam)) {
+                    // top
                     align = 0;
-                else if (CubeConstants.CENTER_ALIGN.equals(alignParam)) // center
+                } else if (CubeConstants.CENTER_ALIGN.equals(alignParam)) {
+                    // center
                     align = 1;
-                else if (CubeConstants.BOTTOM_ALIGN.equals(alignParam)) // bottom
+                } else if (CubeConstants.BOTTOM_ALIGN.equals(alignParam)) {
+                    // bottom
                     align = 2;
+                }
             }
         } else {
             align = 1;
@@ -625,7 +652,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         LogUtil.d(TAG, "performDraw: canvas", isDebuggable);
         synchronized (animThreadLock) {
             LogUtil.d(TAG, "performDraw: START Sync block", isDebuggable);
-            paint.setColor(backgroundColor.colorCode);
+            paint.setColor(backgroundColor);
             if (isInEditMode()) {
                 //Canvas.drawPaint is not supported in editMode...
                 canvas.drawRect(0, 0, 100000, 100000, paint);
@@ -690,30 +717,34 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 double topProd = vProd(perspEye, faceNormals[twistedLayer]);
                 double botProd = vProd(perspEyeI, faceNormals[twistedLayer ^ 1]);
                 int orderMode;
-                if (topProd < 0 && botProd > 0) // top facing away
+                if (topProd < 0 && botProd > 0) {
+                    // top facing away
                     orderMode = 0;
-                else if (topProd > 0 && botProd < 0) // bottom facing away: draw it first
+                } else if (topProd > 0 && botProd < 0) {
+                    // bottom facing away: draw it first
                     orderMode = 1;
-                else // both top and bottom layer facing away: draw them first
+                } else {
+                    // both top and bottom layer facing away: draw them first
                     orderMode = 2;
+                }
                 fixBlock(canvas,
-                        eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
-                        eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
-                        eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][0]]],
-                        blockArray[CubeUtils.drawOrder[orderMode][0]],
-                        CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][0]]);
+                        eyeArray[CubeConstants.eyeOrder[twistedMode][CubeConstants.drawOrder[orderMode][0]]],
+                        eyeArrayX[CubeConstants.eyeOrder[twistedMode][CubeConstants.drawOrder[orderMode][0]]],
+                        eyeArrayY[CubeConstants.eyeOrder[twistedMode][CubeConstants.drawOrder[orderMode][0]]],
+                        blockArray[CubeConstants.drawOrder[orderMode][0]],
+                        CubeConstants.blockMode[twistedMode][CubeConstants.drawOrder[orderMode][0]]);
                 fixBlock(canvas,
-                        eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
-                        eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
-                        eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][1]]],
-                        blockArray[CubeUtils.drawOrder[orderMode][1]],
-                        CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][1]]);
+                        eyeArray[CubeConstants.eyeOrder[twistedMode][CubeConstants.drawOrder[orderMode][1]]],
+                        eyeArrayX[CubeConstants.eyeOrder[twistedMode][CubeConstants.drawOrder[orderMode][1]]],
+                        eyeArrayY[CubeConstants.eyeOrder[twistedMode][CubeConstants.drawOrder[orderMode][1]]],
+                        blockArray[CubeConstants.drawOrder[orderMode][1]],
+                        CubeConstants.blockMode[twistedMode][CubeConstants.drawOrder[orderMode][1]]);
                 fixBlock(canvas,
-                        eyeArray[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
-                        eyeArrayX[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
-                        eyeArrayY[CubeUtils.eyeOrder[twistedMode][CubeUtils.drawOrder[orderMode][2]]],
-                        blockArray[CubeUtils.drawOrder[orderMode][2]],
-                        CubeUtils.blockMode[twistedMode][CubeUtils.drawOrder[orderMode][2]]);
+                        eyeArray[CubeConstants.eyeOrder[twistedMode][CubeConstants.drawOrder[orderMode][2]]],
+                        eyeArrayX[CubeConstants.eyeOrder[twistedMode][CubeConstants.drawOrder[orderMode][2]]],
+                        eyeArrayY[CubeConstants.eyeOrder[twistedMode][CubeConstants.drawOrder[orderMode][2]]],
+                        blockArray[CubeConstants.drawOrder[orderMode][2]],
+                        CubeConstants.blockMode[twistedMode][CubeConstants.drawOrder[orderMode][2]]);
             }
             LogUtil.d(TAG, "performDraw: done end of sync block", isDebuggable);
         }
@@ -769,10 +800,12 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 i++;
                 String s = "";
                 while (i < sequence.length()) {
-                    if (sequence.charAt(i) == '}')
+                    if (sequence.charAt(i) == '}') {
                         break;
-                    if (info)
+                    }
+                    if (info) {
                         s += sequence.charAt(i);
+                    }
                     i++;
                 }
             } else {
@@ -797,9 +830,9 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                         }
                         move[length] += mode * 4;
                         if (i < sequence.length()) {
-                            if (sequence.charAt(i) == '1')
+                            if (sequence.charAt(i) == '1') {
                                 i++;
-                            else if (sequence.charAt(i) == '\''
+                            } else if (sequence.charAt(i) == '\''
                                     || sequence.charAt(i) == '3') {
                                 move[length] += 2;
                                 i++;
@@ -809,8 +842,9 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                                         && sequence.charAt(i) == '\'') {
                                     move[length] += 3;
                                     i++;
-                                } else
+                                } else {
                                     move[length] += 1;
+                                }
                             }
                         }
                         length++;
@@ -821,8 +855,9 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             }
         }
         int[] returnMove = new int[length];
-        for (int i = 0; i < length; i++)
+        for (int i = 0; i < length; i++) {
             returnMove[i] = move[i];
+        }
         return returnMove;
     }
 
@@ -860,11 +895,11 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         }
     }
 
-    private void setCubeDefaultColors() {
+    private void setCubeInDefaultState() {
         // clean the cube
         for (int i = 0; i < 6; i++) {
             for (int j = 0; j < 9; j++) {
-                cube[i][j] = i + 10;
+                cube[i][j] = i;
             }
         }
     }
@@ -873,32 +908,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         for (int i = 0; i < 6; i++) {
             for (int j = 0; j < 9; j++) {
                 cube[i][j] = initialCube[i][j];
-            }
-        }
-    }
-
-    private void doMove(int[][] cube, int[] move, int start, int length, boolean reversed) {
-        int position = reversed ? start + length : start;
-        while (true) {
-            if (reversed) {
-                if (position <= start)
-                    break;
-                position--;
-            }
-            if (move[position] < 1000 && move[position] >= 0) {
-                int modifier = move[position] % 4 + 1;
-                int mode = move[position] / 4 % 6;
-                if (modifier == 4) // reversed double turn
-                    modifier = 2;
-                if (reversed)
-                    modifier = 4 - modifier;
-                twistLayers(cube, move[position] / 24, modifier, mode);
-                LogUtil.e(TAG, "Updated Cube Model -> twistLayers in spin doMove", isDebuggable);
-            }
-            if (!reversed) {
-                position++;
-                if (position >= start + length)
-                    break;
             }
         }
     }
@@ -924,8 +933,9 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                     LogUtil.e(TAG, "animateCube: after wait, interrupted exception:" + e.getMessage(), isDebuggable);
                     break;
                 }
-                if (restarted)
+                if (restarted) {
                     continue;
+                }
                 boolean restart = false;
                 animating = true;
                 int[] mv = move[NEXT_MOVE];
@@ -934,13 +944,15 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                         movePos = 0;
                     }
                 } else {
-                    if (movePos == 0)
+                    if (movePos == 0) {
                         movePos = mv.length;
+                    }
                 }
                 while (true) {
                     if (moveDir < 0) {
-                        if (movePos == 0)
+                        if (movePos == 0) {
                             break;
+                        }
                         movePos--;
                     }
                     if (mv[movePos] == -1) {
@@ -958,8 +970,9 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                         int num = mv[movePos] % 4 + 1;
                         int mode = mv[movePos] / 4 % 6;
                         boolean clockwise = num < 3;
-                        if (num == 4)
+                        if (num == 4) {
                             num = 2;
+                        }
                         if (moveDir < 0) {
                             clockwise = !clockwise;
                             num = 4 - num;
@@ -967,8 +980,9 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                         LogUtil.d(TAG, "animateCube: spin", isDebuggable);
                         spin(mv[movePos] / 24, num, mode, clockwise, moveAnimated);
                         LogUtil.d(TAG, "animateCube: after spin", isDebuggable);
-                        if (moveOne)
+                        if (moveOne) {
                             restart = true;
+                        }
                     }
                     if (moveDir > 0) {
                         movePos++;
@@ -1009,29 +1023,14 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         }
     }
 
-    private void clear() {
-        synchronized (animThreadLock) {
-            movePos = 0;
-            natural = true;
-            mirrored = false;
-            for (int i = 0; i < 6; i++)
-                for (int j = 0; j < 9; j++)
-                    cube[i][j] = initialCube[i][j];
-            for (int i = 0; i < 3; i++) {
-                eye[i] = initialEye[i];
-                eyeX[i] = initialEyeX[i];
-                eyeY[i] = initialEyeY[i];
-            }
-        }
-    }
-
     private void spin(int layer, int num, int mode, boolean clockwise, boolean animated) {
         twisting = false;
         natural = true;
         spinning = true;
         originalAngle = 0;
-        if (faceTwistDirs[layer] > 0)
+        if (faceTwistDirs[layer] > 0) {
             clockwise = !clockwise;
+        }
         if (animated) {
             double phit = Math.PI / 2; // target for currentAngle (default pi/2)
             double phis = clockwise ? 1.0 : -1.0; // sign
@@ -1062,12 +1061,19 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         twisting = false;
         natural = true;
         twistLayers(cube, layer, num, mode);
+        notifyListenerCubeUpdated();
         LogUtil.e(TAG, "Updated Cube Model -> twistLayers in spin", isDebuggable);
         spinning = false;
         if (animated) {
             //TODO         if (animated && (!interrupted || !restarted))
             LogUtil.e(TAG, "Updated Cube Model -> is animated, request repaint", isDebuggable);
             repaint();
+        }
+    }
+
+    private void notifyListenerCubeUpdated() {
+        if (cubeModelUpdatedListener != null) {
+            cubeModelUpdatedListener.onCubeModelUpdate();
         }
     }
 
@@ -1151,12 +1157,13 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             x = x / (1 - z / min); // perspective transformation
             y = y / (1 - z / min); // perspective transformation
             coordsX[i] = width / 2.0 + x;
-            if (align == 0)
+            if (align == 0) {
                 coordsY[i] = height / 2.0 * scale - y;
-            else if (align == 2)
+            } else if (align == 2) {
                 coordsY[i] = height - (height / 2.0 * scale) - y;
-            else
+            } else {
                 coordsY[i] = height / 2.0 - y;
+            }
         }
         // setup corner co-ordinates for all faces
         for (int i = 0; i < 6; i++) { // all faces
@@ -1187,7 +1194,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                                     fillX[j] += mirrored ? -x : x;
                                     fillY[j] -= y;
                                 }
-                                paint.setColor(colors[cube[i][p * 3 + q]].colorCode);
+                                paint.setColor(cubeColors[cube[i][p * 3 + q]]);
                                 paint.setStyle(Paint.Style.FILL);
 
                                 path.reset();
@@ -1199,7 +1206,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
 
                                 canvas.drawPath(path, paint);
                                 paint.setStyle(Paint.Style.STROKE);
-                                paint.setColor(colors[cube[i][p * 3 + q]].darker());
+                                paint.setColor(darkerColor(cubeColors[cube[i][p * 3 + q]]));
                                 canvas.drawPath(path, paint);
                             }
                         }
@@ -1207,17 +1214,19 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 }
             }
         }
-        // draw black antialias
+        // draw antialias
         for (int i = 0; i < 6; i++) { // all faces
             int sideW = blocks[i][0][1] - blocks[i][0][0];
             int sideH = blocks[i][1][1] - blocks[i][1][0];
             if (sideW > 0 && sideH > 0) {
-                for (int j = 0; j < 4; j++) // corner co-ordinates
+                for (int j = 0; j < 4; j++) { // corner co-ordinates
                     getCorners(i, j, fillX, fillY, blocks[i][0][factors[j][0]], blocks[i][1][factors[j][1]], mirrored);
-                if (sideW == 3 && sideH == 3)
-                    paint.setColor(backgroundColor2.colorCode);
-                else
-                    paint.setColor(android.graphics.Color.BLACK);
+                }
+                if (sideW == 3 && sideH == 3) {
+                    paint.setColor(backgroundColor2);
+                } else {
+                    paint.setColor(faceletsContourColor);
+                }
                 path.reset();
                 path.moveTo(fillX[0], fillY[0]);
                 path.lineTo(fillX[1], fillY[1]);
@@ -1227,7 +1236,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 canvas.drawPath(path, paint);
             }
         }
-        // find and draw black inner faces
+        // find and draw inner faces
         for (int i = 0; i < 6; i++) { // all faces
             int sideW = blocks[i][0][1] - blocks[i][0][0];
             int sideH = blocks[i][1][1] - blocks[i][1][0];
@@ -1239,7 +1248,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                     if (mirrored)
                         fillX[j] = width - fillX[j];
                 }
-                paint.setColor(android.graphics.Color.BLACK);
+                paint.setColor(faceletsContourColor);
 
                 path.reset();
                 path.moveTo(fillX[0], fillY[0]);
@@ -1251,11 +1260,13 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 canvas.drawPath(path, paint);
 
             } else {
-                // draw black face background (do not care about normals and visibility!)
-                for (int j = 0; j < 4; j++) // corner co-ordinates
+                // draw face background (do not care about normals and visibility!)
+                for (int j = 0; j < 4; j++) {
+                    // corner co-ordinates
                     getCorners(i, j, fillX, fillY, blocks[i][0][factors[j][0]], blocks[i][1][factors[j][1]], mirrored);
+                }
 
-                paint.setColor(android.graphics.Color.BLACK);
+                paint.setColor(faceletsContourColor);
 
                 path.reset();
                 path.moveTo(fillX[0], fillY[0]);
@@ -1277,10 +1288,11 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                     // draw colored facelets
                     for (int n = 0, p = blocks[i][1][0]; n < sideH; n++, p++) {
                         for (int o = 0, q = blocks[i][0][0]; o < sideW; o++, q++) {
-                            for (int j = 0; j < 4; j++)
+                            for (int j = 0; j < 4; j++) {
                                 getCorners(i, j, fillX, fillY, q + border[j][0], p + border[j][1], mirrored);
+                            }
 
-                            paint.setColor(colors[cube[i][p * 3 + q]].darker());
+                            paint.setColor(darkerColor(cubeColors[cube[i][p * 3 + q]]));
 
                             path.reset();
                             path.moveTo(fillX[0], fillY[0]);
@@ -1290,7 +1302,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                             path.close();
                             canvas.drawPath(path, paint);
 
-                            paint.setColor(colors[cube[i][p * 3 + q]].colorCode);
+                            paint.setColor(cubeColors[cube[i][p * 3 + q]]);
                             path.reset();
                             path.moveTo(fillX[0], fillY[0]);
                             path.lineTo(fillX[1], fillY[1]);
@@ -1302,8 +1314,10 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                         }
                     }
                 }
-                if (!editable || animating) // no need of twisting while animating
+                if (!editable || animating) {
+                    // no need of twisting while animating
                     continue;
+                }
                 // horizontal and vertical directions of face - interpolated
                 double dxh = (cooX[i][1] - cooX[i][0] + cooX[i][2] - cooX[i][3]) / 6.0;
                 double dyh = (cooX[i][3] - cooX[i][0] + cooX[i][2] - cooX[i][1]) / 6.0;
@@ -1314,14 +1328,17 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                         break;
                     }
                     for (int j = 0; j < 6; j++) { // 4 areas 3x1 per face + 2 center slices
-                        for (int k = 0; k < 4; k++) // 4 points per area
+                        for (int k = 0; k < 4; k++) {
+                            // 4 points per area
                             getCorners(i, k, dragCornersX[dragAreas], dragCornersY[dragAreas],
                                     dragBlocks[j][k][0], dragBlocks[j][k][1], false);
+                        }
                         dragDirsX[dragAreas] = (dxh * areaDirs[j][0] + dxv * areaDirs[j][1]) * twistDirs[i][j];
                         dragDirsY[dragAreas] = (dyh * areaDirs[j][0] + dyv * areaDirs[j][1]) * twistDirs[i][j];
                         dragLayers[dragAreas] = adjacentFaces[i][j % 4];
-                        if (j >= 4)
+                        if (j >= 4) {
                             dragLayers[dragAreas] &= ~1;
+                        }
                         dragModes[dragAreas] = j / 4;
                         dragAreas++;
                         if (dragAreas >= 18) {
@@ -1334,9 +1351,10 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                     }
                     if (i != twistedLayer && sideW > 0 && sideH > 0) { // only 3x1 faces
                         int j = sideW == 3 ? (blocks[i][1][0] == 0 ? 0 : 2) : (blocks[i][0][0] == 0 ? 3 : 1);
-                        for (int k = 0; k < 4; k++)
+                        for (int k = 0; k < 4; k++) {
                             getCorners(i, k, dragCornersX[dragAreas], dragCornersY[dragAreas],
                                     dragBlocks[j][k][0], dragBlocks[j][k][1], false);
+                        }
                         dragDirsX[dragAreas] = (dxh * areaDirs[j][0] + dxv * areaDirs[j][1]) * twistDirs[i][j];
                         dragDirsY[dragAreas] = (dyh * areaDirs[j][0] + dyv * areaDirs[j][1]) * twistDirs[i][j];
                         dragLayers[dragAreas] = twistedLayer;
@@ -1349,9 +1367,10 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                     }
                     if (i != twistedLayer && sideW > 0 && sideH > 0) { // only 3x1 faces
                         int j = sideW == 3 ? 4 : 5;
-                        for (int k = 0; k < 4; k++)
+                        for (int k = 0; k < 4; k++) {
                             getCorners(i, k, dragCornersX[dragAreas], dragCornersY[dragAreas],
                                     dragBlocks[j][k][0], dragBlocks[j][k][1], false);
+                        }
                         dragDirsX[dragAreas] = (dxh * areaDirs[j][0] + dxv * areaDirs[j][1]) * twistDirs[i][j];
                         dragDirsY[dragAreas] = (dyh * areaDirs[j][0] + dyv * areaDirs[j][1]) * twistDirs[i][j];
                         dragLayers[dragAreas] = twistedLayer;
@@ -1372,37 +1391,42 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         double y2 = cooY[face][3] + (cooY[face][2] - cooY[face][3]) * factor1;
         cornersX[corner] = (int) (0.5 + x1 + (x2 - x1) * factor2);
         cornersY[corner] = (int) (0.5 + y1 + (y2 - y1) * factor2);
-        if (mirror)
+        if (mirror) {
             cornersX[corner] = width - cornersX[corner];
+        }
     }
 
     private void handlePointerDownEvent(MotionEvent e) {
         lastDragX = lastX = Math.round(e.getX());
         lastDragY = lastY = Math.round(e.getY());
         toTwist = false;
-        if (mirrored)
+        if (mirrored) {
             lastDragX = lastX = width - lastX;
-        if (editable && !animating)
+        }
+        if (editable && !animating) {
             toTwist = true;
+        }
     }
 
     private void handlePointerUpEvent() {
-        dragging = false;
         if (twisting && !spinning) {
             twisting = false;
             originalAngle += currentAngle;
             currentAngle = 0.0;
             double angle = originalAngle;
-            while (angle < 0.0)
+            while (angle < 0.0) {
                 angle += 32.0 * Math.PI;
+            }
             int num = (int) (angle * 8.0 / Math.PI) % 16; // 2pi ~ 16
             if (num % 4 == 0 || num % 4 == 3) { // close enough to a corner
                 num = (num + 1) / 4; // 2pi ~ 4
-                if (faceTwistDirs[twistedLayer] > 0)
+                if (faceTwistDirs[twistedLayer] > 0) {
                     num = (4 - num) % 4;
+                }
                 originalAngle = 0;
                 natural = true; // the cube in the natural state
                 twistLayers(cube, twistedLayer, num, twistedMode); // rotate the facelets
+                notifyListenerCubeUpdated();
                 LogUtil.e(TAG, "Updated Cube Model -> twistLayers in handlePointerUpEvent", isDebuggable);
             }
             repaint();
@@ -1410,25 +1434,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     }
 
     private void handlePointerDragEvent(MotionEvent e) {
-        if (dragging) {
-            stopAnimation();
-            int len = realMoveLength(move[NEXT_MOVE]);
-            int pos = ((Math.round(e.getX()) - 1) * len * 2 / (width - 2) + 1) / 2;
-            pos = Math.max(0, Math.min(len, pos));
-            if (pos > 0)
-                pos = arrayMovePos(move[NEXT_MOVE], pos);
-            if (pos > movePos) {
-                doMove(cube, move[NEXT_MOVE], movePos, pos - movePos, false);
-                LogUtil.e(TAG, "Updated Cube Model -> handlePointerDragEvent#1", isDebuggable);
-            }
-            if (pos < movePos) {
-                doMove(cube, move[NEXT_MOVE], pos, movePos - pos, true);
-                LogUtil.e(TAG, "Updated Cube Model -> handlePointerDragEvent#2", isDebuggable);
-            }
-            movePos = pos;
-            repaint();
-            return;
-        }
         int x = mirrored ? width - Math.round(e.getX()) : Math.round(e.getX());
         int y = Math.round(e.getY());
         int dx = Math.round((x - lastX) / touchSensitivityCoefficient);
@@ -1446,8 +1451,10 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 double a = (y2 * (lastX - d1) - y1 * (lastY - d2)) / (x1 * y2 - y1 * x2);
                 double b = (-x2 * (lastX - d1) + x1 * (lastY - d2)) / (x1 * y2 - y1 * x2);
                 if (a > 0 && a < 1 && b > 0 && b < 1) { // we are in
-                    if (dx * dx + dy * dy < 144) // delay the decision about twisting
+                    if (dx * dx + dy * dy < 144) {
+                        // delay the decision about twisting
                         return;
+                    }
                     dragX = dragDirsX[i];
                     dragY = dragDirsY[i];
                     double d = Math.abs(dragX * dx + dragY * dy) / Math.sqrt((dragX * dragX + dragY * dragY) * (dx * dx + dy * dy));
@@ -1473,11 +1480,29 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             lastX = x;
             lastY = y;
         } else {
-            if (natural)
+            if (natural) {
                 splitCube(twistedLayer);
+            }
             currentAngle = 0.03 * (dragX * dx + dragY * dy) / Math.sqrt(dragX * dragX + dragY * dragY); // dv * cos a
         }
         repaint();
     }
 
+    public CubeModelUpdatedListener getCubeModelUpdatedListener() {
+        return cubeModelUpdatedListener;
+    }
+
+    public void setCubeModelUpdatedListener(CubeModelUpdatedListener cubeModelUpdatedListener) {
+        this.cubeModelUpdatedListener = cubeModelUpdatedListener;
+    }
+
+    public int[][] getCubeModel() {
+        synchronized (animThreadLock) {
+            return cube;
+        }
+    }
+
+    public interface CubeModelUpdatedListener {
+        void onCubeModelUpdate();
+    }
 }

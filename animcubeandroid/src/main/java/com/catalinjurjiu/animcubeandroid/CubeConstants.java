@@ -1,5 +1,7 @@
 package com.catalinjurjiu.animcubeandroid;
 
+import android.support.annotation.IntDef;
+
 /**
  * Contains the constants form the cube solver, 3D solution display and from the RubikCube, RubikFace classes
  */
@@ -195,4 +197,14 @@ public class CubeConstants {
     public static final String TOP_ALIGN = "top";
     public static final String CENTER_ALIGN = "center";
     public static final String BOTTOM_ALIGN = "bottom";
+
+    @IntDef
+    public @interface CubeColors {
+        int WHITE = 0,
+                YELLOW = 1,
+                ORANGE = 2,
+                RED = 3,
+                GREEN = 4,
+                BLUE = 5;
+    }
 }

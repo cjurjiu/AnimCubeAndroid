@@ -1,41 +1,13 @@
 package com.catalinjurjiu.animcubeandroid;
 
+import android.graphics.Color;
+import android.support.annotation.ColorInt;
+
 /**
  * Created by catalin on 05.06.2017.
  */
 
 public class CubeUtils {
-
-    // cube colors
-    public static final Color[] colors = {
-            new Color(255, 128, 64),   // 0 - light orange
-            new Color(255, 0, 0),      // 1 - pure red
-            new Color(0, 255, 0),      // 2 - pure green
-            new Color(0, 0, 255),      // 3 - pure blue
-            new Color(153, 153, 153),  // 4 - white grey
-            new Color(170, 170, 68),   // 5 - yellow grey
-            new Color(187, 119, 68),   // 6 - orange grey
-            new Color(153, 68, 68),    // 7 - red grey
-            new Color(68, 119, 68),    // 8 - green grey
-            new Color(0, 68, 119),     // 9 - blue grey
-            new Color(255, 255, 255), // W - white
-            new Color(255, 255, 0),  // Y - yellow
-            new Color(255, 96, 32),   // O - orange
-            new Color(208, 0, 0),     // R - red
-            new Color(0, 144, 0),     // G - green
-            new Color(32, 64, 208),   // B - blue
-            new Color(176, 176, 176), // L - light gray
-            new Color(80, 80, 80),    // D - dark gray
-            new Color(255, 0, 255),   // M - magenta
-            new Color(0, 255, 255),   // C - cyan
-            new Color(255, 160, 192), // P - pink
-            new Color(32, 255, 16),   // N - light green
-            new Color(0, 0, 0),       // K - black
-            new Color(128, 128, 128) // . - gray
-    };
-    public static final int[][] eyeOrder = {{1, 0, 0}, {0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {1, 0, 1}, {1, 0, 2}};
-    public static final int[][] blockMode = {{0, 2, 2}, {2, 1, 2}, {2, 2, 2}, {2, 2, 2}, {2, 2, 2}, {2, 2, 2}};
-    public static final int[][] drawOrder = {{0, 1, 2}, {2, 1, 0}, {0, 2, 1}};
 
     public static int realMoveLength(int[] move) {
         int length = 0;
@@ -61,6 +33,10 @@ public class CubeUtils {
             }
         }
         return pos;
+    }
+
+    public static int darkerColor(@ColorInt int colorInt) {
+        return Color.rgb((int) (Color.red(colorInt) * 0.6), (int) (Color.green(colorInt) * 0.6), (int) (Color.blue(colorInt) * 0.6));
     }
 
     public static double[] vCopy(double[] vector, double[] srcVec) {
