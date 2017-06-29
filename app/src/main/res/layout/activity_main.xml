@@ -7,7 +7,7 @@
     android:layout_height="match_parent"
     tools:context="com.catalinjujiu.testrubikrenderer.MainActivity">
 
-    <com.catalinjurjiu.originalcoderemade.AnimCube
+    <com.catalinjurjiu.animcubeandroid.AnimCube
         android:id="@+id/animcube"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -16,6 +16,6 @@
         app:debuggable="true"
         app:editable="true"
         app:moves="R2' U M U' R2' U M' U'"
-        app:single_rotation_speed="5"/>
+        app:single_rotation_speed="30"/>
 
 </FrameLayout>
