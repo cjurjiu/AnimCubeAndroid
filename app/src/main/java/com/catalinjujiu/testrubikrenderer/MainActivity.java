@@ -10,7 +10,7 @@ import android.view.MenuItem;
 import com.catalinjurjiu.animcubeandroid.AnimCube;
 import com.catalinjurjiu.animcubeandroid.CubeConstants;
 
-public class MainActivity extends Activity implements AnimCube.CubeModelUpdatedListener {
+public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdatedListener {
 
     public static final String ANIM_CUBE_SAVE_STATE_BUNDLE_ID = "animCube";
     private static final String TAG = "AnimCubeActivity";
@@ -24,7 +24,7 @@ public class MainActivity extends Activity implements AnimCube.CubeModelUpdatedL
         setContentView(R.layout.activity_main);
         animCube = (AnimCube) findViewById(R.id.animcube);
         animCube.setMoveSequence("R2' U M U' R2' U M' U'");
-        animCube.setCubeModelUpdatedListener(this);
+        animCube.setOnCubeModelUpdatedListener(this);
     }
 
     @Override
@@ -38,16 +38,16 @@ public class MainActivity extends Activity implements AnimCube.CubeModelUpdatedL
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.start_moves:
-                animCube.startAnimation(CubeConstants.AnimationModes.AUTO_PLAY_FORWARD);
+                animCube.startAnimation(CubeConstants.AnimationMode.AUTO_PLAY_FORWARD);
                 break;
             case R.id.stop_moves:
                 animCube.stopAnimation();
                 break;
             case R.id.one_move_forward:
-                animCube.startAnimation(CubeConstants.AnimationModes.STEP_FORWARD);
+                animCube.startAnimation(CubeConstants.AnimationMode.STEP_FORWARD);
                 break;
             case R.id.one_move_backward:
-                animCube.startAnimation(CubeConstants.AnimationModes.STEP_BACKWARD);
+                animCube.startAnimation(CubeConstants.AnimationMode.STEP_BACKWARD);
                 break;
             case R.id.reset_to_initial:
                 animCube.resetToInitialState();

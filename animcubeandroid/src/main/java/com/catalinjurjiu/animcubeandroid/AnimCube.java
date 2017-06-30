@@ -7,23 +7,19 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.AnimationModes.AUTO_FAST_BACKWARD;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.AnimationModes.AUTO_FAST_FORWARD;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.AnimationModes.AUTO_PLAY_BACKWARD;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.AnimationModes.AUTO_PLAY_FORWARD;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.AnimationModes.STEP_BACKWARD;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.AnimationModes.STEP_FAST_BACKWARD;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.AnimationModes.STEP_FAST_FORWARD;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.AnimationModes.STEP_FORWARD;
-import static com.catalinjurjiu.animcubeandroid.CubeConstants.AnimationModes.STOPPED;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.AnimationMode;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.adjacentFaces;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.areaDirs;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.blockMode;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.border;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.botBlockFaceDim;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.cornerCoords;
@@ -34,12 +30,17 @@ import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.c
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.cycleOffsets;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.cycleOrder;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.dragBlocks;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.drawOrder;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.eyeOrder;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.faceCorners;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.faceNormals;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.faceTwistDirs;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.factors;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.midBlockFaceDim;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.midBlockTable;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.modeChar;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.moveCodes;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.moveModes;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.oppositeCorners;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.rotCos;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.rotSign;
@@ -48,6 +49,10 @@ import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.r
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.topBlockFaceDim;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.topBlockTable;
 import static com.catalinjurjiu.animcubeandroid.CubeConstants.ComputationLogic.twistDirs;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.CubeAlign;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.CubeColors;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.CubeState;
+import static com.catalinjurjiu.animcubeandroid.CubeConstants.DEFAULT_INITIAL_CUBE_ROTATION;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.darkerColor;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.vAdd;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.vCopy;
@@ -60,17 +65,8 @@ import static com.catalinjurjiu.animcubeandroid.CubeUtils.vSub;
 @SuppressWarnings("unused")
 public final class AnimCube extends SurfaceView implements View.OnTouchListener, SurfaceHolder.Callback {
     public static final String TAG = "AnimCube";
-    public static final String STATE_CUBE = "AnimCubeState::cube";
-    public static final String STATE_INITIAL_CUBE = "AnimCubeState::initialCube";
-    public static final String STATE_MOVE = "AnimCubeState::move";
-    public static final String STATE_MOVE_POS = "AnimCubeState::movePos";
     private static final int NEXT_MOVE = 0;
-    private static final String STATE_EYE = "AnimCubeState::eye";
-    private static final String STATE_EYE_X = "AnimCubeState::eyeX";
-    private static final String STATE_EYE_Y = "AnimCubeState::eyeY";
-    private static final String STATE_IS_ANIMATING = "AnimCubeState::isAnimating";
-    private static final String STATE_ANIMATION_MODE = "AnimCubeState::animationMode";
-    private static final String STATE_ORIGINAL_ANGLE = "AnimCubeState::originalAngle";
+    private static final int NOTIFY_LISTENER_ANIMATION_FINISHED = 4242;
     // cube facelets
     private final int[][] cube = new int[6][9];
     private final int[][] initialCube = new int[6][9];
@@ -154,7 +150,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     private boolean moveOne;
     private boolean moveAnimated;
     // double buffered animation
-    // cube window size (applet window is resizable)
+    // cube window size
     private int width;
     private int height;
     // last position of mouse (for dragging the cube)
@@ -169,12 +165,23 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     private double dragX;
     private double dragY;
     private Thread animThread; // thread to perform the animation
-    private float touchSensitivityCoefficient;
-    private boolean mActionDownReceived;
-    private boolean isDebuggable;
     private boolean animThreadInactive;
-    private int animationMode = -1;
-    private CubeModelUpdatedListener cubeModelUpdatedListener;
+    private boolean mActionDownReceived;
+    private float touchSensitivityCoefficient;
+    private int animationMode = AnimationMode.STOPPED;
+    private int backFacesDistance;
+    private OnCubeModelUpdatedListener onCubeModelUpdatedListener;
+    private OnCubeAnimationFinishedListener onCubeAnimationFinishedListener;
+    private Handler mainThreadHandler = new Handler(Looper.getMainLooper()) {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            if (msg.what == NOTIFY_LISTENER_ANIMATION_FINISHED) {
+                notifyListenerAnimationFinishedOnMainThread();
+            }
+        }
+    };
+    private boolean isDebuggable;
     private Runnable animRunnable = new Runnable() {
         @Override
         public void run() {
@@ -205,12 +212,12 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
 
     /**
      * <p>
-     * Returns an {@code int[6][9]} representing the current cube model. Each integer in the array is a {@link CubeConstants.CubeColors} and represents the color for a particular
+     * Returns an {@code int[6][9]} representing the current cube model. Each integer in the array is a {@link CubeColors} and represents the color for a particular
      * facelet.
      * </p>
      * <p>
-     * If custom colors have been defined, then a mapping between {@link CubeConstants.CubeColors} and the custom color scheme needs to be performed, as the integers in the
-     * array will still be values from {@link CubeConstants.CubeColors}.
+     * If custom colors have been defined, then a mapping between {@link CubeColors} and the custom color scheme needs to be performed, as the integers in the
+     * array will still be values from {@link CubeColors}.
      * </p>
      *
      * @return an {code int[6][9] containing the cube colors for each facelet}
@@ -223,11 +230,33 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
 
     /**
      * <p>
+     * Sets the cube in the specified state. This method expects an {@code int[6][9]} array(i.e. 6 faces, 9 facelets on each face).
+     * </p>
+     * <p>
+     * The array needs to be populated with integers specified in {@link CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
+     * order in which faces are specified is not relevant, since {@link AnimCube} doesn't care about the cube model that much. The specified model doesn't even have to be a
+     * valid Rubik's cube.
+     * </p>
+     * <p>
+     * <b>Note:</b> after this is set {@link #resetToInitialState()} will reset the cube to the state set here, not to the cube state previous to calling {@link #setCubeModel(String)}.
+     * </p>
+     *
+     * @param colorValues an {@code int[6][9]} array with color values from {@link CubeColors}
+     */
+    public void setCubeModel(int[][] colorValues) {
+        CubeUtils.deepCopy2DArray(colorValues, cube);
+        CubeUtils.deepCopy2DArray(colorValues, initialCube);
+        notifyListenerCubeUpdated();
+        repaint();
+    }
+
+    /**
+     * <p>
      * Sets the cube in the specified state. This method expects a {@link String} with exactly 54 characters (i.e. 9 facelets on each cube face * 6 cube faces). If the string
      * is of different length, nothing will happen.
      * </p>
      * <p>
-     * The string needs to be a sequence of integers specified in {@link CubeConstants.CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
+     * The string needs to be a sequence of integers specified in {@link CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
      * order in which faces are specified is not relevant, since {@link AnimCube} doesn't care about the cube model that much. The specified model doesn't even have to be a
      * valid Rubik's cube.
      * </p>
@@ -247,27 +276,85 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         if (wasValid) {
             notifyListenerCubeUpdated();
         }
+        repaint();
+    }
+
+    /**
+     * Enables or disables individual face rotation through user touch event.
+     *
+     * @param isEditable {@code true} if the user should be able to edit the cube, {@code false} otherwise
+     */
+    public void setEditable(boolean isEditable) {
+        this.editable = isEditable;
+    }
+
+    /**
+     * Sets back faces distance from the cube. Typically, a value smaller than 2 means they won't be visible.
+     * <p>
+     *
+     * @param backFaceDistance integer (typically between 2-10, but not necessarily), representing the distance of the backfaces from the cube.
+     * @see <a href="http://software.rubikscube.info/AnimCube/#hint">Complete documentation of back faces distance (originally called <i>hint</i>)</a>
+     */
+    public void setBackFacesDistance(int backFaceDistance) {
+        setBackFacesDistanceInternal(backFaceDistance);
+        repaint();
     }
 
     /**
      * <p>
-     * Sets the cube in the specified state. This method expects an {@code int[6][9]} array(i.e. 6 faces, 9 facelets on each face).
+     * Sets the rotation speed of a single rotation. This parameter allows to customize the speed of quarter turn separately from face turns.
      * </p>
      * <p>
-     * The array needs to be populated with integers specified in {@link CubeConstants.CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
-     * order in which faces are specified is not relevant, since {@link AnimCube} doesn't care about the cube model that much. The specified model doesn't even have to be a
-     * valid Rubik's cube.
+     * The value should consist only of decimal digits.
      * </p>
      * <p>
-     * <b>Note:</b> after this is set {@link #resetToInitialState()} will reset the cube to the state set here, not to the cube state previous to calling {@link #setCubeModel(String)}.
+     * The higher value the slower is the animation. The default value is 10, which corresponds to approximately 1 second for face turn and approximately 2/3
+     * seconds for quarter turn if not specified differently.
+     * </p>
+     * <p>
+     * The face turn speed can be adjusted separately by {@link #setDoubleRotationSpeed(int)}.
      * </p>
      *
-     * @param colorValues an {@code int[6][9]} array with color values from {@link CubeConstants.CubeColors}
+     * @param singleRotationSpeed the desired rotation speed.
      */
-    public void setCubeModel(int[][] colorValues) {
-        CubeUtils.deepCopy2DArray(colorValues, cube);
-        CubeUtils.deepCopy2DArray(colorValues, initialCube);
-        notifyListenerCubeUpdated();
+    public void setSingleRotationSpeed(int singleRotationSpeed) {
+        this.speed = singleRotationSpeed;
+    }
+
+    /**
+     * <p>
+     * Sets the rotation speed of a double rotation. This parameter allows to customize the speed of face turns separately from quarter turns.
+     * </p>
+     * <p>
+     * The value should consist only of decimal digits.
+     * </p>
+     * <p>The higher value the slower is the animation. The default value is 10, which corresponds to approximately 1 second
+     * for the face turn.
+     * <p>
+     * The default is set to the 150% of the value of speed.
+     * </p>
+     * <p>
+     * The quarter turn speed can be adjusted by {@link #setSingleRotationSpeed(int)}.
+     * </p>
+     *
+     * @param doubleRotationSpeed the desired rotation speed.
+     */
+    public void setDoubleRotationSpeed(int doubleRotationSpeed) {
+        this.doubleSpeed = doubleRotationSpeed;
+    }
+
+    /**
+     * <p>
+     * Enables or disables debug mode.
+     * </p>
+     * <p>
+     * This is disabled by default.
+     * </p>
+     *
+     * @param isDebuggable {@code true} to enable debug mode, {@code false} to disable it.
+     */
+    public void setDebuggable(boolean isDebuggable) {
+        this.isDebuggable = isDebuggable;
     }
 
     /**
@@ -382,11 +469,11 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      * Begins performing the moves specified through {@link #setMoveSequence(String)}.
      * </p>
      * <p>
-     * Supports several <i>animation modes</i>, specified through values from {@link CubeConstants.AnimationModes}.
+     * Supports several <i>animation modes</i>, specified through values from {@link AnimationMode}.
      * </p>
      *
-     * @param mode a values from {@link CubeConstants.AnimationModes} indicating the desires animation mode.
-     * @see CubeConstants.AnimationModes
+     * @param mode a values from {@link AnimationMode} indicating the desires animation mode.
+     * @see AnimationMode
      */
     public void startAnimation(int mode) {
         LogUtil.e(TAG, "startAnimation. mode:" + mode, isDebuggable);
@@ -397,42 +484,42 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 return;
             }
             switch (mode) {
-                case AUTO_PLAY_FORWARD: // play forward
+                case AnimationMode.AUTO_PLAY_FORWARD: // play forward
                     moveDir = 1;
                     moveOne = false;
                     moveAnimated = true;
                     break;
-                case AUTO_PLAY_BACKWARD: // play backward
+                case AnimationMode.AUTO_PLAY_BACKWARD: // play backward
                     moveDir = -1;
                     moveOne = false;
                     moveAnimated = true;
                     break;
-                case STEP_FORWARD: // step forward
+                case AnimationMode.STEP_FORWARD: // step forward
                     moveDir = 1;
                     moveOne = true;
                     moveAnimated = true;
                     break;
-                case STEP_BACKWARD: // step backward
+                case AnimationMode.STEP_BACKWARD: // step backward
                     moveDir = -1;
                     moveOne = true;
                     moveAnimated = true;
                     break;
-                case AUTO_FAST_FORWARD: // fast forward
+                case AnimationMode.AUTO_FAST_FORWARD: // fast forward
                     moveDir = 1;
                     moveOne = false;
                     moveAnimated = false;
                     break;
-                case AUTO_FAST_BACKWARD: // fast forward
+                case AnimationMode.AUTO_FAST_BACKWARD: // fast forward
                     moveDir = -1;
                     moveOne = false;
                     moveAnimated = false;
                     break;
-                case STEP_FAST_FORWARD: // step one fast forward
+                case AnimationMode.STEP_FAST_FORWARD: // step one fast forward
                     moveDir = 1;
                     moveOne = true;
                     moveAnimated = false;
                     break;
-                case STEP_FAST_BACKWARD: // step one fast backward
+                case AnimationMode.STEP_FAST_BACKWARD: // step one fast backward
                     moveDir = -1;
                     moveOne = true;
                     moveAnimated = false;
@@ -451,7 +538,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     public void stopAnimation() {
         LogUtil.e(TAG, "stopAnimation.", isDebuggable);
         synchronized (animThreadLock) {
-            animationMode = STOPPED;
+            animationMode = AnimationMode.STOPPED;
             LogUtil.e(TAG, "stopAnimation acquired lock.", isDebuggable);
             restarted = true;
             LogUtil.e(TAG, "stopAnimation: notify", isDebuggable);
@@ -474,42 +561,71 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      * Register a lister to be notified when the cube model is updated.
      * </p>
      * <p>
-     * This normally happens after a spin animation, when the user manually rotates a cube side.
+     * This normally happens after a spin animation, or after the user manually rotates a cube side.
      * </p>
      *
-     * @param cubeModelUpdatedListener
+     * @param onCubeModelUpdatedListener the listener interested in cube model updates
      */
-    public void setCubeModelUpdatedListener(CubeModelUpdatedListener cubeModelUpdatedListener) {
-        this.cubeModelUpdatedListener = cubeModelUpdatedListener;
+    public void setOnCubeModelUpdatedListener(OnCubeModelUpdatedListener onCubeModelUpdatedListener) {
+        synchronized (animThreadLock) {
+            this.onCubeModelUpdatedListener = onCubeModelUpdatedListener;
+        }
     }
 
     /**
+     * <p>
+     * Register a lister to be notified when the cube has finished animating a move sequence.
+     * </p>
+     *
+     * @param onCubeAnimationFinishedListener the listener interested being notified when the cube animation completes.
+     */
+    public void setOnAnimationFinishedListener(OnCubeAnimationFinishedListener onCubeAnimationFinishedListener) {
+        synchronized (animThreadLock) {
+            if (onCubeAnimationFinishedListener == null) {
+                //listener removed, shutdown handler
+                this.mainThreadHandler.removeMessages(NOTIFY_LISTENER_ANIMATION_FINISHED);
+            }
+            this.onCubeAnimationFinishedListener = onCubeAnimationFinishedListener;
+        }
+    }
+
+    /**
+     * <p>
      * Saves the cube current state to a bundle, in order for it to be recovered after a configuration change or after the app is resumed from background.
+     * </p>
+     * <p>
+     * If needed, the saved state can be read from the bundle by reading the values stored at keys defined in {@link CubeState}.
+     * </p>
      *
      * @return a {@link Bundle} containing the cube's current state
+     * @see #restoreState(Bundle)
      */
     public Bundle saveState() {
         Bundle b = new Bundle();
+        int[][] cubeDeepCopy = new int[6][9];
         synchronized (animThreadLock) {
-            b.putBoolean(STATE_IS_ANIMATING, animating);
-            b.putInt(STATE_ANIMATION_MODE, animationMode);
-            int[][] cubeDeepCopy = new int[6][9];
             CubeUtils.deepCopy2DArray(cube, cubeDeepCopy);
-
             for (int i = 0; i < cubeDeepCopy.length; i++) {
-                b.putIntArray(STATE_CUBE + i, cubeDeepCopy[i]);
+                b.putIntArray(CubeState.KEY_CUBE + i, cubeDeepCopy[i]);
             }
             for (int i = 0; i < initialCube.length; i++) {
-                b.putIntArray(STATE_INITIAL_CUBE + i, initialCube[i]);
+                b.putIntArray(CubeState.KEY_INITIAL_CUBE + i, initialCube[i]);
             }
             for (int i = 0; i < move.length; i++) {
-                b.putIntArray(STATE_MOVE + i, move[i]);
+                b.putIntArray(CubeState.KEY_MOVE + i, move[i]);
             }
-            b.putDoubleArray(STATE_EYE, eye);
-            b.putDoubleArray(STATE_EYE_X, eyeX);
-            b.putDoubleArray(STATE_EYE_Y, eyeY);
-            b.putDouble(STATE_ORIGINAL_ANGLE, originalAngle);
-            b.putInt(STATE_MOVE_POS, movePos);
+            b.putBoolean(CubeState.KEY_IS_ANIMATING, animating);
+            b.putInt(CubeState.KEY_ANIMATION_MODE, animationMode);
+            b.putDoubleArray(CubeState.KEY_EYE, eye);
+            b.putDoubleArray(CubeState.KEY_EYE_X, eyeX);
+            b.putDoubleArray(CubeState.KEY_EYE_Y, eyeY);
+            b.putDouble(CubeState.KEY_ORIGINAL_ANGLE, originalAngle);
+            b.putInt(CubeState.KEY_MOVE_POS, movePos);
+            b.putBoolean(CubeState.KEY_EDITABLE, editable);
+            b.putInt(CubeState.KEY_BACKFACES_DISTANCE, backFacesDistance);
+            b.putInt(CubeState.KEY_SINGLE_ROTATION_SPEED, speed);
+            b.putInt(CubeState.KEY_DOUBLE_ROTATION_SPEED, doubleSpeed);
+            b.putBoolean(CubeState.KEY_IS_DEBUGGABLE, isDebuggable);
         }
         return b;
     }
@@ -519,38 +635,47 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      * Restores a previously saved state.
      * </p>
      * <p>
-     * If the cube was animating with either {@link CubeConstants.AnimationModes#AUTO_PLAY_FORWARD} or {@link CubeConstants.AnimationModes#AUTO_PLAY_BACKWARD} when its
+     * If the cube was animating with either {@link AnimationMode#AUTO_PLAY_FORWARD} or {@link AnimationMode#AUTO_PLAY_BACKWARD} when its
      * state was saved, then this method will also resume the animation and repeat the step that was interrupted by the configuration change.
      * </p>
      *
      * @param state a {@link Bundle} containing a previously saved state of the cube.
+     * @see #saveState()
      */
     public void restoreState(Bundle state) {
         synchronized (animThreadLock) {
             for (int i = 0; i < cube.length; i++) {
-                cube[i] = state.getIntArray(STATE_CUBE + i);
+                cube[i] = state.getIntArray(CubeState.KEY_CUBE + i);
             }
             for (int i = 0; i < initialCube.length; i++) {
-                initialCube[i] = state.getIntArray(STATE_INITIAL_CUBE + i);
+                initialCube[i] = state.getIntArray(CubeState.KEY_INITIAL_CUBE + i);
             }
             for (int i = 0; i < move.length; i++) {
-                move[i] = state.getIntArray(STATE_MOVE + i);
+                move[i] = state.getIntArray(CubeState.KEY_MOVE + i);
             }
 
-            movePos = state.getInt(STATE_MOVE_POS);
-            originalAngle = state.getDouble(STATE_ORIGINAL_ANGLE);
+            movePos = state.getInt(CubeState.KEY_MOVE_POS);
+            originalAngle = state.getDouble(CubeState.KEY_ORIGINAL_ANGLE);
 
-            double[] buffer = state.getDoubleArray(STATE_EYE);
+            double[] buffer = state.getDoubleArray(CubeState.KEY_EYE);
             System.arraycopy(buffer, 0, eye, 0, eye.length);
-            buffer = state.getDoubleArray(STATE_EYE_X);
+            buffer = state.getDoubleArray(CubeState.KEY_EYE_X);
             System.arraycopy(buffer, 0, eyeX, 0, eyeX.length);
-            buffer = state.getDoubleArray(STATE_EYE_Y);
+            buffer = state.getDoubleArray(CubeState.KEY_EYE_Y);
             System.arraycopy(buffer, 0, eyeY, 0, eyeY.length);
+
+            editable = state.getBoolean(CubeState.KEY_EDITABLE);
+            backFacesDistance = state.getInt(CubeState.KEY_BACKFACES_DISTANCE);
+            setBackFacesDistanceInternal(backFacesDistance);
+            speed = state.getInt(CubeState.KEY_SINGLE_ROTATION_SPEED);
+            doubleSpeed = state.getInt(CubeState.KEY_DOUBLE_ROTATION_SPEED);
+            isDebuggable = state.getBoolean(CubeState.KEY_IS_DEBUGGABLE);
+
             repaint();
-            boolean animating = state.getBoolean(STATE_IS_ANIMATING);
+            boolean animating = state.getBoolean(CubeState.KEY_IS_ANIMATING);
             if (animating) {
-                int animationMode = state.getInt(STATE_ANIMATION_MODE);
-                if (animationMode == AUTO_PLAY_FORWARD || animationMode == AUTO_PLAY_BACKWARD) {
+                int animationMode = state.getInt(CubeState.KEY_ANIMATION_MODE);
+                if (animationMode == AnimationMode.AUTO_PLAY_FORWARD || animationMode == AnimationMode.AUTO_PLAY_BACKWARD) {
                     startAnimation(animationMode);
                 }
             }
@@ -568,6 +693,8 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         getHolder().removeCallback(this);
         animThread.interrupt();
         animRunnable = null;
+        mainThreadHandler = null;
+        setOnTouchListener(null);
         LogUtil.d(TAG, "cleanUpResources: finish", isDebuggable);
     }
 
@@ -724,7 +851,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
 
     private void initInitialRotation(TypedArray attributes) {
         int styleableIndex = R.styleable.AnimCube_initialRotation;
-        String initialRotation = CubeConstants.DEFAULT_INITIAL_CUBE_ROTATION;
+        String initialRotation = DEFAULT_INITIAL_CUBE_ROTATION;
         if (attributes.hasValue(styleableIndex)) {
             initialRotation = attributes.getString(styleableIndex);
         }
@@ -733,18 +860,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
 
     private void initBackFacesDistance(TypedArray attributes) {
         int backFaceDistance = attributes.getInt(R.styleable.AnimCube_backFacesDistance, 0);
-        if (backFaceDistance >= 2 && backFaceDistance <= 10) {
-            this.showBackFaces = true;
-            this.faceShift = backFaceDistance;
-            if (this.faceShift < 1.0) {
-                this.showBackFaces = false;
-            } else {
-                this.faceShift /= 10.0;
-            }
-        } else {
-            this.showBackFaces = false;
-            this.faceShift = 0;
-        }
+        setBackFacesDistanceInternal(backFaceDistance);
     }
 
     private void initGestureSensitivity(TypedArray attributes) {
@@ -775,13 +891,13 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             if (alignParam == null) {
                 align = 1;
             } else {
-                if (CubeConstants.CubeAlign.TOP.equals(alignParam)) {
+                if (CubeAlign.TOP.equals(alignParam)) {
                     // top
                     align = 0;
-                } else if (CubeConstants.CubeAlign.CENTER.equals(alignParam)) {
+                } else if (CubeAlign.CENTER.equals(alignParam)) {
                     // center
                     align = 1;
-                } else if (CubeConstants.CubeAlign.BOTTOM.equals(alignParam)) {
+                } else if (CubeAlign.BOTTOM.equals(alignParam)) {
                     // bottom
                     align = 2;
                 }
@@ -879,23 +995,23 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                     orderMode = 2;
                 }
                 fixBlock(canvas,
-                        eyeArray[CubeConstants.ComputationLogic.eyeOrder[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][0]]],
-                        eyeArrayX[CubeConstants.ComputationLogic.eyeOrder[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][0]]],
-                        eyeArrayY[CubeConstants.ComputationLogic.eyeOrder[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][0]]],
-                        blockArray[CubeConstants.ComputationLogic.drawOrder[orderMode][0]],
-                        CubeConstants.ComputationLogic.blockMode[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][0]]);
+                        eyeArray[eyeOrder[twistedMode][drawOrder[orderMode][0]]],
+                        eyeArrayX[eyeOrder[twistedMode][drawOrder[orderMode][0]]],
+                        eyeArrayY[eyeOrder[twistedMode][drawOrder[orderMode][0]]],
+                        blockArray[drawOrder[orderMode][0]],
+                        blockMode[twistedMode][drawOrder[orderMode][0]]);
                 fixBlock(canvas,
-                        eyeArray[CubeConstants.ComputationLogic.eyeOrder[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][1]]],
-                        eyeArrayX[CubeConstants.ComputationLogic.eyeOrder[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][1]]],
-                        eyeArrayY[CubeConstants.ComputationLogic.eyeOrder[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][1]]],
-                        blockArray[CubeConstants.ComputationLogic.drawOrder[orderMode][1]],
-                        CubeConstants.ComputationLogic.blockMode[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][1]]);
+                        eyeArray[eyeOrder[twistedMode][drawOrder[orderMode][1]]],
+                        eyeArrayX[eyeOrder[twistedMode][drawOrder[orderMode][1]]],
+                        eyeArrayY[eyeOrder[twistedMode][drawOrder[orderMode][1]]],
+                        blockArray[drawOrder[orderMode][1]],
+                        blockMode[twistedMode][drawOrder[orderMode][1]]);
                 fixBlock(canvas,
-                        eyeArray[CubeConstants.ComputationLogic.eyeOrder[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][2]]],
-                        eyeArrayX[CubeConstants.ComputationLogic.eyeOrder[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][2]]],
-                        eyeArrayY[CubeConstants.ComputationLogic.eyeOrder[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][2]]],
-                        blockArray[CubeConstants.ComputationLogic.drawOrder[orderMode][2]],
-                        CubeConstants.ComputationLogic.blockMode[twistedMode][CubeConstants.ComputationLogic.drawOrder[orderMode][2]]);
+                        eyeArray[eyeOrder[twistedMode][drawOrder[orderMode][2]]],
+                        eyeArrayX[eyeOrder[twistedMode][drawOrder[orderMode][2]]],
+                        eyeArrayY[eyeOrder[twistedMode][drawOrder[orderMode][2]]],
+                        blockArray[drawOrder[orderMode][2]],
+                        blockMode[twistedMode][drawOrder[orderMode][2]]);
             }
             LogUtil.d(TAG, "performDraw: done end of sync block", isDebuggable);
         }
@@ -953,15 +1069,15 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 for (int j = 0; j < 21; j++) {
                     if (sequence.charAt(i) == "UDFBLRESMXYZxyzudfblr".charAt(j)) {
                         i++;
-                        int mode = CubeConstants.ComputationLogic.moveModes[j];
-                        move[length] = CubeConstants.ComputationLogic.moveCodes[j] * 24;
+                        int mode = moveModes[j];
+                        move[length] = moveCodes[j] * 24;
                         if (i < sequence.length()) {
-                            if (CubeConstants.ComputationLogic.moveModes[j] == 0) { // modifiers
+                            if (moveModes[j] == 0) { // modifiers
                                 // for basic
                                 // characters
                                 // UDFBLR
-                                for (int k = 0; k < CubeConstants.ComputationLogic.modeChar.length; k++) {
-                                    if (sequence.charAt(i) == CubeConstants.ComputationLogic.modeChar[k]) {
+                                for (int k = 0; k < modeChar.length; k++) {
+                                    if (sequence.charAt(i) == modeChar[k]) {
                                         mode = k + 1;
                                         i++;
                                         break;
@@ -1046,7 +1162,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         }
         for (int i = 0; i < 6; i++) {
             for (int j = 0; j < 9; j++) {
-                for (int k = CubeConstants.CubeColors.WHITE; k < CubeConstants.CubeColors.GREEN + 1; k++) {
+                for (int k = CubeColors.WHITE; k < CubeColors.GREEN + 1; k++) {
                     if (Integer.parseInt(colorValues.charAt(i * 9 + j) + "") == k) {
                         cube[i][j] = k;
                         break;
@@ -1056,6 +1172,22 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         }
         CubeUtils.deepCopy2DArray(cube, initialCube);
         return true;
+    }
+
+    private void setBackFacesDistanceInternal(int backFaceDistance) {
+        this.backFacesDistance = backFaceDistance;
+        if (backFaceDistance >= 2 && backFaceDistance <= 10) {
+            this.showBackFaces = true;
+            this.faceShift = backFaceDistance;
+            if (this.faceShift < 1.0) {
+                this.showBackFaces = false;
+            } else {
+                this.faceShift /= 10.0;
+            }
+        } else {
+            this.showBackFaces = false;
+            this.faceShift = 0;
+        }
     }
 
     private void resetCubeColors() {
@@ -1149,9 +1281,10 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                     }
                 }
                 animating = false;
-                animationMode = STOPPED;
+                animationMode = AnimationMode.STOPPED;
                 LogUtil.d(TAG, "animateCube: repaint at end of loop", isDebuggable);
                 repaint();
+                notifyAnimationFinishedHandler();
             } while (!interrupted);
             animThreadInactive = true;
         }
@@ -1245,8 +1378,20 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     private void notifyListenerCubeUpdated() {
         int[][] cubeCopy = new int[6][9];
         CubeUtils.deepCopy2DArray(cube, cubeCopy);
-        if (cubeModelUpdatedListener != null) {
-            cubeModelUpdatedListener.onCubeModelUpdate(cubeCopy);
+        if (onCubeModelUpdatedListener != null) {
+            onCubeModelUpdatedListener.onCubeModelUpdate(cubeCopy);
+        }
+    }
+
+    private void notifyAnimationFinishedHandler() {
+        if (mainThreadHandler != null) {
+            mainThreadHandler.sendEmptyMessage(NOTIFY_LISTENER_ANIMATION_FINISHED);
+        }
+    }
+
+    private void notifyListenerAnimationFinishedOnMainThread() {
+        if (onCubeAnimationFinishedListener != null) {
+            onCubeAnimationFinishedListener.onAnimationFinished();
         }
     }
 
@@ -1655,7 +1800,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      * Interface definition for a callback to be invoked when the cube model has changed.
      * </p>
      */
-    public interface CubeModelUpdatedListener {
+    public interface OnCubeModelUpdatedListener {
         /**
          * <p>
          * Invoked when the cube model has been updated. See {@link #getCubeModel()} to understand how to interpret the cube model.
@@ -1683,5 +1828,23 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
          * @see #setCubeModel(int[][])
          */
         void onCubeModelUpdate(int[][] newCubeModel);
+    }
+
+    /**
+     * <p>
+     * Interface definition for a callback to be invoked when the cube has finished animating a move.
+     * </p>
+     */
+    public interface OnCubeAnimationFinishedListener {
+        /**
+         * <p>
+         * Invoked when the cube has finished an animation previously started with {@link #startAnimation(int)}.
+         * </p>
+         * <p>
+         * When {@link #startAnimation(int)} is called with a {@link AnimationMode} that performs several spins (e.g. {@link AnimationMode#AUTO_PLAY_FORWARD}, then
+         * this callback will only be called when all the moves in the sequence have been performed, and not at the end of each spin.
+         * </p>
+         */
+        void onAnimationFinished();
     }
 }

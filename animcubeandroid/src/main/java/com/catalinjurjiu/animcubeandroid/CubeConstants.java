@@ -18,7 +18,7 @@ public class CubeConstants {
     }
 
     @IntDef
-    public @interface AnimationModes {
+    public @interface AnimationMode {
         int STOPPED = -1, // STOPPED
                 AUTO_PLAY_FORWARD = 0, // play forward
                 AUTO_PLAY_BACKWARD = 1, // play backward
@@ -39,6 +39,25 @@ public class CubeConstants {
                 BLUE = 4,
                 GREEN = 5;
 
+    }
+
+    @StringDef
+    public @interface CubeState {
+        String KEY_CUBE = "AnimCubeState::cube",
+                KEY_INITIAL_CUBE = "AnimCubeState::initialCube",
+                KEY_MOVE = "AnimCubeState::move",
+                KEY_MOVE_POS = "AnimCubeState::movePos",
+                KEY_EYE = "AnimCubeState::eye",
+                KEY_EYE_X = "AnimCubeState::eyeX",
+                KEY_EYE_Y = "AnimCubeState::eyeY",
+                KEY_IS_ANIMATING = "AnimCubeState::isAnimating",
+                KEY_ANIMATION_MODE = "AnimCubeState::animationMode",
+                KEY_ORIGINAL_ANGLE = "AnimCubeState::originalAngle",
+                KEY_EDITABLE = "AnimCubeState::editable",
+                KEY_BACKFACES_DISTANCE = "AnimCubeState::backfacesDistance",
+                KEY_SINGLE_ROTATION_SPEED = "AnimCubeState::singleRotationSpeed",
+                KEY_DOUBLE_ROTATION_SPEED = "AnimCubeState::doubleRotationSpeed",
+                KEY_IS_DEBUGGABLE = "AnimCubeState::isDebuggable";
     }
 
     static class ComputationLogic {
