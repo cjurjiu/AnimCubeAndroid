@@ -2,6 +2,9 @@ package com.catalinjujiu.testrubikrenderer;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -16,6 +19,23 @@ public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdate
     private static final String TAG = "AnimCubeActivity";
     private AnimCube animCube;
     private Bundle state;
+
+    private Handler testMainThreadHandler = new Handler(Looper.getMainLooper()) {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            Log.d(TAG, "getCubeModel");
+            switch (msg.what) {
+                case 1:
+                    animCube.setMoveSequence("R2' L M U' R2' U M' U'");
+                    break;
+                case 2:
+//                    animCube.setSingleRotationSpeed(5);
+                    break;
+            }
+
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,6 +59,8 @@ public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdate
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.start_moves:
+                testMainThreadHandler.sendEmptyMessageDelayed(1, 100);
+//                testMainThreadHandler.sendEmptyMessageDelayed(2, 6548);
                 animCube.startAnimation(CubeConstants.AnimationMode.AUTO_PLAY_FORWARD);
                 break;
             case R.id.stop_moves:
@@ -83,12 +105,17 @@ public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdate
         Log.d(TAG, "onDestroy");
         animCube.cleanUpResources();
         Log.d(TAG, "onDestroy: finish");
+        testMainThreadHandler = null;
     }
 
     @Override
     public void onCubeModelUpdate(int[][] newCubeModel) {
-        Log.d(TAG, "Cube model updated. New model:");
-        int[][] cube = animCube.getCubeModel();
+        Log.d(TAG, "Cube model updated!");
+        printCubeModel(newCubeModel);
+    }
+
+    void printCubeModel(int[][] cube) {
+        Log.d(TAG, "Cube model:");
         StringBuilder stringBuilder = new StringBuilder("");
         for (int i = 0; i < cube.length; i++) {
             stringBuilder.append("\n");

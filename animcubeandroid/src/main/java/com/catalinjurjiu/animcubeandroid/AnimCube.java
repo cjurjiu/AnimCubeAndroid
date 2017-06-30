@@ -63,7 +63,7 @@ import static com.catalinjurjiu.animcubeandroid.CubeUtils.vScale;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.vSub;
 
 @SuppressWarnings("unused")
-public final class AnimCube extends SurfaceView implements View.OnTouchListener, SurfaceHolder.Callback {
+public final class AnimCube extends SurfaceView implements View.OnTouchListener {
     public static final String TAG = "AnimCube";
     private static final int NOTIFY_LISTENER_ANIMATION_FINISHED = 4242;
     private static final int NOTIFY_LISTENER_MODEL_UPDATED = 2424;
@@ -195,6 +195,36 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             animateCube();
         }
     };
+    private SurfaceHolder.Callback surfaceCallback = new SurfaceHolder.Callback() {
+
+        @Override
+        public void surfaceCreated(SurfaceHolder holder) {
+            LogUtil.d(TAG, "Surface Created", isDebuggable);
+            synchronized (animThreadLock) {
+                if (animThreadInactive || interrupted) {
+                    LogUtil.d(TAG, "AnimThread was either inactive or interrupted, recreate", isDebuggable);
+                    animThread.interrupt();
+                    animThread = new Thread(animRunnable);
+                    animThread.start();
+                }
+                repaint();
+            }
+        }
+
+        @Override
+        public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+            LogUtil.d(TAG, "Surface surfaceChanged", isDebuggable);
+            repaint();
+        }
+
+        @Override
+        public void surfaceDestroyed(SurfaceHolder holder) {
+            LogUtil.d(TAG, "Surface surfaceDestroyed", isDebuggable);
+
+            stopAnimationAndDrawing();
+            LogUtil.d(TAG, "surfaceDestroyed: end", isDebuggable);
+        }
+    };
 
     public AnimCube(Context context) {
         super(context);
@@ -237,6 +267,28 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
 
     /**
      * <p>
+     * Sets the cube in the specified state. This method expects an {@code int[6][9]} array(i.e. 6 faces, 9 facelets on each face).
+     * </p>
+     * <p>
+     * The array needs to be populated with integers specified in {@link CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
+     * order in which faces are specified is not relevant, since {@link AnimCube} doesn't care about the cube model that much. The specified model doesn't even have to be a
+     * valid Rubik's cube.
+     * </p>
+     * <p>
+     * <b>Note:</b> after this is set {@link #resetToInitialState()} will reset the cube to the state set here, not to the cube state previous to calling {@link #setCubeModel(String)}.
+     * </p>
+     *
+     * @param colorValues an {@code int[6][9]} array with color values from {@link CubeColors}
+     */
+    public void setCubeModel(int[][] colorValues) {
+        CubeUtils.deepCopy2DArray(colorValues, cube);
+        CubeUtils.deepCopy2DArray(colorValues, initialCube);
+        notifyHandlerAnimationFinished();
+        repaint();
+    }
+
+    /**
+     * <p>
      * Sets the cube in the specified state. This method expects a {@link String} with exactly 54 characters (i.e. 9 facelets on each cube face * 6 cube faces). If the string
      * is of different length, nothing will happen.
      * </p>
@@ -265,25 +317,12 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     }
 
     /**
-     * <p>
-     * Sets the cube in the specified state. This method expects an {@code int[6][9]} array(i.e. 6 faces, 9 facelets on each face).
-     * </p>
-     * <p>
-     * The array needs to be populated with integers specified in {@link CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
-     * order in which faces are specified is not relevant, since {@link AnimCube} doesn't care about the cube model that much. The specified model doesn't even have to be a
-     * valid Rubik's cube.
-     * </p>
-     * <p>
-     * <b>Note:</b> after this is set {@link #resetToInitialState()} will reset the cube to the state set here, not to the cube state previous to calling {@link #setCubeModel(String)}.
-     * </p>
+     * Reads whether individual face rotation through user touch events are allowed.
      *
-     * @param colorValues an {@code int[6][9]} array with color values from {@link CubeColors}
+     * @return {@code true} if editable mode is enabled, {@code false} otherwise
      */
-    public void setCubeModel(int[][] colorValues) {
-        CubeUtils.deepCopy2DArray(colorValues, cube);
-        CubeUtils.deepCopy2DArray(colorValues, initialCube);
-        notifyHandlerAnimationFinished();
-        repaint();
+    public boolean isEditable() {
+        return editable;
     }
 
     /**
@@ -296,15 +335,28 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     }
 
     /**
-     * Sets back faces distance from the cube. Typically, a value smaller than 2 means they won't be visible.
      * <p>
+     * Sets back faces distance from the cube. Typically, a value smaller than 2 means they won't be visible.
+     * </p>
+     * <p><b>Note:</b> In principle this works fine if called while the cube is animating, however the effect is rather sudden and noticeable.</p>
      *
-     * @param backFaceDistance integer (typically between 2-10, but not necessarily), representing the distance of the backfaces from the cube.
+     * @param backFaceDistance integer (typically between 2-10, but not necessarily), representing the distance of the back faces from the cube.
      * @see <a href="http://software.rubikscube.info/AnimCube/#hint">Complete documentation of back faces distance (originally called <i>hint</i>)</a>
      */
     public void setBackFacesDistance(int backFaceDistance) {
         setBackFacesDistanceInternal(backFaceDistance);
         repaint();
+    }
+
+    /**
+     * Checks whether the cube is currently animating a move, or not.
+     *
+     * @return {@code true} if the cube is currently animating a move, {@code false} otherwise
+     */
+    public boolean isAnimating() {
+        synchronized (animThreadLock) {
+            return animating;
+        }
     }
 
     /**
@@ -320,6 +372,9 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      * </p>
      * <p>
      * The face turn speed can be adjusted separately by {@link #setDoubleRotationSpeed(int)}.
+     * </p>
+     * <p>
+     * If this is called while the cube is animating a move, its effects will only be applied starting with the next move.
      * </p>
      *
      * @param singleRotationSpeed the desired rotation speed.
@@ -342,6 +397,9 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      * </p>
      * <p>
      * The quarter turn speed can be adjusted by {@link #setSingleRotationSpeed(int)}.
+     * </p>
+     * <p>
+     * If this is called while the cube is animating a move, its effects will only be applied starting with the next move.
      * </p>
      *
      * @param doubleRotationSpeed the desired rotation speed.
@@ -703,7 +761,8 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     public void cleanUpResources() {
         LogUtil.d(TAG, "cleanUpResources", isDebuggable);
         stopAnimationAndDrawing();
-        getHolder().removeCallback(this);
+        getHolder().removeCallback(surfaceCallback);
+        surfaceCallback = null;
         animThread.interrupt();
         animRunnable = null;
         mainThreadHandler = null;
@@ -737,39 +796,11 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     }
 
     @Override
-    public void onDraw(Canvas canvas) {
+    protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         if (isInEditMode()) {
             performDraw(canvas);
         }
-    }
-
-    @Override
-    public void surfaceCreated(SurfaceHolder holder) {
-        LogUtil.d(TAG, "Surface Created", isDebuggable);
-        synchronized (animThreadLock) {
-            if (animThreadInactive || interrupted) {
-                LogUtil.d(TAG, "AnimThread was either inactive or interrupted, recreate", isDebuggable);
-                animThread.interrupt();
-                animThread = new Thread(animRunnable);
-                animThread.start();
-            }
-            repaint();
-        }
-    }
-
-    @Override
-    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        LogUtil.d(TAG, "Surface surfaceChanged", isDebuggable);
-        repaint();
-    }
-
-    @Override
-    public void surfaceDestroyed(SurfaceHolder holder) {
-        LogUtil.d(TAG, "Surface surfaceDestroyed", isDebuggable);
-
-        stopAnimationAndDrawing();
-        LogUtil.d(TAG, "surfaceDestroyed: end", isDebuggable);
     }
 
     private void init(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
@@ -797,7 +828,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         if (!isInEditMode()) {
             // get the surface holder of he current surface view, add this view as a
             // callback
-            getHolder().addCallback(this);
+            getHolder().addCallback(surfaceCallback);
             animThread = new Thread(animRunnable, "AnimThread");
             // start animation thread
             animThread.start();
