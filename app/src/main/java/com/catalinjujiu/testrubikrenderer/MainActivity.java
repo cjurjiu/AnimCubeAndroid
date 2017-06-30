@@ -10,7 +10,7 @@ import android.view.MenuItem;
 import com.catalinjurjiu.animcubeandroid.AnimCube;
 import com.catalinjurjiu.animcubeandroid.CubeConstants;
 
-public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdatedListener {
+public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdatedListener, AnimCube.OnCubeAnimationFinishedListener {
 
     public static final String ANIM_CUBE_SAVE_STATE_BUNDLE_ID = "animCube";
     private static final String TAG = "AnimCubeActivity";
@@ -25,6 +25,7 @@ public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdate
         animCube = (AnimCube) findViewById(R.id.animcube);
         animCube.setMoveSequence("R2' U M U' R2' U M' U'");
         animCube.setOnCubeModelUpdatedListener(this);
+        animCube.setOnAnimationFinishedListener(this);
     }
 
     @Override
@@ -52,12 +53,8 @@ public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdate
             case R.id.reset_to_initial:
                 animCube.resetToInitialState();
                 break;
-            case R.id.freeze:
-                //TODO
-                break;
             case R.id.save_state:
                 state = animCube.saveState();
-                //TODO
                 break;
             case R.id.restore_state:
                 animCube.restoreState(state);
@@ -108,5 +105,10 @@ public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdate
             }
         }
         Log.d(TAG, stringBuilder.toString());
+    }
+
+    @Override
+    public void onAnimationFinished() {
+        Log.d(TAG, "Cube AnimationFinished!");
     }
 }

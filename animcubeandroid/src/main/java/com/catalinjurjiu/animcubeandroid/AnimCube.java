@@ -65,8 +65,8 @@ import static com.catalinjurjiu.animcubeandroid.CubeUtils.vSub;
 @SuppressWarnings("unused")
 public final class AnimCube extends SurfaceView implements View.OnTouchListener, SurfaceHolder.Callback {
     public static final String TAG = "AnimCube";
-    private static final int NEXT_MOVE = 0;
     private static final int NOTIFY_LISTENER_ANIMATION_FINISHED = 4242;
+    private static final int NOTIFY_LISTENER_MODEL_UPDATED = 2424;
     // cube facelets
     private final int[][] cube = new int[6][9];
     private final int[][] initialCube = new int[6][9];
@@ -144,7 +144,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     private boolean showBackFaces;
     private double faceShift;
     // move sequence data
-    private int[][] move;
+    private int[] move;
     private int movePos;
     private int moveDir;
     private boolean moveOne;
@@ -170,18 +170,25 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     private float touchSensitivityCoefficient;
     private int animationMode = AnimationMode.STOPPED;
     private int backFacesDistance;
-    private OnCubeModelUpdatedListener onCubeModelUpdatedListener;
-    private OnCubeAnimationFinishedListener onCubeAnimationFinishedListener;
+    private OnCubeModelUpdatedListener cubeModelUpdatedListener;
+    private OnCubeAnimationFinishedListener cubeAnimationFinishedListener;
+    private boolean isDebuggable;
     private Handler mainThreadHandler = new Handler(Looper.getMainLooper()) {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
-            if (msg.what == NOTIFY_LISTENER_ANIMATION_FINISHED) {
-                notifyListenerAnimationFinishedOnMainThread();
+            switch (msg.what) {
+                case NOTIFY_LISTENER_ANIMATION_FINISHED:
+                    notifyListenerAnimationFinishedOnMainThread();
+                    break;
+                case NOTIFY_LISTENER_MODEL_UPDATED:
+                    notifyListenerCubeUpdatedOnMainThread();
+                    break;
+                default:
+                    LogUtil.w(TAG, "Unknown message in main thread handler", isDebuggable);
             }
         }
     };
-    private boolean isDebuggable;
     private Runnable animRunnable = new Runnable() {
         @Override
         public void run() {
@@ -230,28 +237,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
 
     /**
      * <p>
-     * Sets the cube in the specified state. This method expects an {@code int[6][9]} array(i.e. 6 faces, 9 facelets on each face).
-     * </p>
-     * <p>
-     * The array needs to be populated with integers specified in {@link CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
-     * order in which faces are specified is not relevant, since {@link AnimCube} doesn't care about the cube model that much. The specified model doesn't even have to be a
-     * valid Rubik's cube.
-     * </p>
-     * <p>
-     * <b>Note:</b> after this is set {@link #resetToInitialState()} will reset the cube to the state set here, not to the cube state previous to calling {@link #setCubeModel(String)}.
-     * </p>
-     *
-     * @param colorValues an {@code int[6][9]} array with color values from {@link CubeColors}
-     */
-    public void setCubeModel(int[][] colorValues) {
-        CubeUtils.deepCopy2DArray(colorValues, cube);
-        CubeUtils.deepCopy2DArray(colorValues, initialCube);
-        notifyListenerCubeUpdated();
-        repaint();
-    }
-
-    /**
-     * <p>
      * Sets the cube in the specified state. This method expects a {@link String} with exactly 54 characters (i.e. 9 facelets on each cube face * 6 cube faces). If the string
      * is of different length, nothing will happen.
      * </p>
@@ -274,8 +259,30 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
     public void setCubeModel(String colorValues) {
         boolean wasValid = setStringCubeModelInternal(colorValues);
         if (wasValid) {
-            notifyListenerCubeUpdated();
+            notifyHandlerCubeModelUpdated();
         }
+        repaint();
+    }
+
+    /**
+     * <p>
+     * Sets the cube in the specified state. This method expects an {@code int[6][9]} array(i.e. 6 faces, 9 facelets on each face).
+     * </p>
+     * <p>
+     * The array needs to be populated with integers specified in {@link CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
+     * order in which faces are specified is not relevant, since {@link AnimCube} doesn't care about the cube model that much. The specified model doesn't even have to be a
+     * valid Rubik's cube.
+     * </p>
+     * <p>
+     * <b>Note:</b> after this is set {@link #resetToInitialState()} will reset the cube to the state set here, not to the cube state previous to calling {@link #setCubeModel(String)}.
+     * </p>
+     *
+     * @param colorValues an {@code int[6][9]} array with color values from {@link CubeColors}
+     */
+    public void setCubeModel(int[][] colorValues) {
+        CubeUtils.deepCopy2DArray(colorValues, cube);
+        CubeUtils.deepCopy2DArray(colorValues, initialCube);
+        notifyHandlerAnimationFinished();
         repaint();
     }
 
@@ -397,7 +404,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      * </ul>
      * </p>
      * <p>
-     * The applet supports some additional characters to represent specific moves. The center layers can be rotated using the following characters in combination with previous modifiers.
+     * The library supports some additional characters to represent specific moves. The center layers can be rotated using the following characters in combination with previous modifiers.
      * <ul>
      * <li>E - equator (between U and D layers in the U'/D direction)</li>
      * <li>S - standing (between F and B layers in the F/B' direction)</li>
@@ -405,7 +412,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      * </ul>
      * </p>
      * <p>
-     * The applet also supports turns of the entire cube. This feature can be used to rotate the cube in order to show the cube in the best position for the current situation to watch the move sequence. The available symbols to rotate the cube are shown in the following table (they can be also combined with the modifiers).
+     * The library also supports turns of the entire cube. This feature can be used to rotate the cube in order to show the cube in the best position for the current situation to watch the move sequence. The available symbols to rotate the cube are shown in the following table (they can be also combined with the modifiers).
      * <ul>
      * <li> X - rotate around x-axis (in the same direction as "R" or "L'" is performed)</li>
      * <li>Y - rotate around y-axis (in the same direction as "F" or "B'" is performed)</li>
@@ -426,7 +433,9 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      * <p>
      * There is yet another character to be used in the parameter value - the dot '.' character. When a dot is found in the sequence during playing the animation, it is delayed for a half of the time the quarter turn is performed.
      * </p>
-     * <p><b>Note:</b> For additional details and a few left out alternatives to certain notation, see Joseph's complete documentation for the move sequence <a href="http://software.rubikscube.info/AnimCube/#move">here.</a></p>
+     * <p><b>Important:</b> In Joseph Jelink's original AnimCube applet there could be several move sequences specified in the same string. The sequences were separated by the semicolon character ';'. This feature however is disabled in this version.<br>
+     * If the move sequence string passed to this method has more than one move sequences defined, only the first will be taken into consideration, and the next will be ignored.</p>
+     * <p><b>Note:</b> For additional details and a few left out alternatives to certain notations, see Joseph's complete documentation for the move sequence <a href="http://software.rubikscube.info/AnimCube/#move">here.</a></p>
      *
      * @param moveSequence a {@link String} containing the desired move sequence, using the format described above.
      * @see <a href="http://software.rubikscube.info/AnimCube/#move">Joseph's Jelinek complete documentation for the move sequence.</a>
@@ -458,7 +467,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             resetCubeColors();
             if (!wasAnimating) {
                 //notify listeners is also called when interrupting a current animation..this is just s.t. it won't be called twice.
-                notifyListenerCubeUpdated();
+                notifyHandlerCubeModelUpdated();
             }
         }
         repaint();
@@ -480,7 +489,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         synchronized (animThreadLock) {
             LogUtil.e(TAG, "startAnimation. acquired lock", isDebuggable);
             stopAnimation();
-            if (move.length == 0 || move[NEXT_MOVE].length == 0) {
+            if (move.length == 0) {
                 return;
             }
             switch (mode) {
@@ -568,7 +577,11 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      */
     public void setOnCubeModelUpdatedListener(OnCubeModelUpdatedListener onCubeModelUpdatedListener) {
         synchronized (animThreadLock) {
-            this.onCubeModelUpdatedListener = onCubeModelUpdatedListener;
+            if (onCubeModelUpdatedListener == null) {
+                //listener removed, shutdown handler
+                this.mainThreadHandler.removeMessages(NOTIFY_LISTENER_MODEL_UPDATED);
+            }
+            this.cubeModelUpdatedListener = onCubeModelUpdatedListener;
         }
     }
 
@@ -585,7 +598,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 //listener removed, shutdown handler
                 this.mainThreadHandler.removeMessages(NOTIFY_LISTENER_ANIMATION_FINISHED);
             }
-            this.onCubeAnimationFinishedListener = onCubeAnimationFinishedListener;
+            this.cubeAnimationFinishedListener = onCubeAnimationFinishedListener;
         }
     }
 
@@ -611,16 +624,18 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             for (int i = 0; i < initialCube.length; i++) {
                 b.putIntArray(CubeState.KEY_INITIAL_CUBE + i, initialCube[i]);
             }
-            for (int i = 0; i < move.length; i++) {
-                b.putIntArray(CubeState.KEY_MOVE + i, move[i]);
-            }
+            b.putIntArray(CubeState.KEY_MOVE, move);
             b.putBoolean(CubeState.KEY_IS_ANIMATING, animating);
             b.putInt(CubeState.KEY_ANIMATION_MODE, animationMode);
             b.putDoubleArray(CubeState.KEY_EYE, eye);
             b.putDoubleArray(CubeState.KEY_EYE_X, eyeX);
             b.putDoubleArray(CubeState.KEY_EYE_Y, eyeY);
             b.putDouble(CubeState.KEY_ORIGINAL_ANGLE, originalAngle);
-            b.putInt(CubeState.KEY_MOVE_POS, movePos);
+            if (moveDir == -1) {
+                b.putInt(CubeState.KEY_MOVE_POS, movePos == move.length ? move.length : movePos + 1);
+            } else {
+                b.putInt(CubeState.KEY_MOVE_POS, movePos);
+            }
             b.putBoolean(CubeState.KEY_EDITABLE, editable);
             b.putInt(CubeState.KEY_BACKFACES_DISTANCE, backFacesDistance);
             b.putInt(CubeState.KEY_SINGLE_ROTATION_SPEED, speed);
@@ -635,8 +650,8 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
      * Restores a previously saved state.
      * </p>
      * <p>
-     * If the cube was animating with either {@link AnimationMode#AUTO_PLAY_FORWARD} or {@link AnimationMode#AUTO_PLAY_BACKWARD} when its
-     * state was saved, then this method will also resume the animation and repeat the step that was interrupted by the configuration change.
+     * If the cube was animating when its state was saved, then this method will also resume the animation and repeat the step
+     * that was interrupted by the configuration change.
      * </p>
      *
      * @param state a {@link Bundle} containing a previously saved state of the cube.
@@ -650,10 +665,8 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             for (int i = 0; i < initialCube.length; i++) {
                 initialCube[i] = state.getIntArray(CubeState.KEY_INITIAL_CUBE + i);
             }
-            for (int i = 0; i < move.length; i++) {
-                move[i] = state.getIntArray(CubeState.KEY_MOVE + i);
-            }
 
+            move = state.getIntArray(CubeState.KEY_MOVE);
             movePos = state.getInt(CubeState.KEY_MOVE_POS);
             originalAngle = state.getDouble(CubeState.KEY_ORIGINAL_ANGLE);
 
@@ -675,7 +688,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             boolean animating = state.getBoolean(CubeState.KEY_IS_ANIMATING);
             if (animating) {
                 int animationMode = state.getInt(CubeState.KEY_ANIMATION_MODE);
-                if (animationMode == AnimationMode.AUTO_PLAY_FORWARD || animationMode == AnimationMode.AUTO_PLAY_BACKWARD) {
+                if (animationMode != AnimationMode.STOPPED) {
                     startAnimation(animationMode);
                 }
             }
@@ -840,7 +853,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         if (moves != null) {
             setMoveSequence(moves);
         } else {
-            move = new int[0][0];
+            move = new int[0];
         }
         movePos = 0;
     }
@@ -1029,7 +1042,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         }
     }
 
-    private int[][] getMove(String sequence) {
+    private int[] getMove(String sequence) {
         int num = 1;
         int pos = sequence.indexOf(';');
         while (pos != -1) {
@@ -1046,7 +1059,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
             pos = sequence.indexOf(';', lastPos);
         }
         move[num] = getMovePart(sequence.substring(lastPos));
-        return move;
+        return move[0];
     }
 
     private int[] getMovePart(String sequence) {
@@ -1220,7 +1233,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 }
                 boolean restart = false;
                 animating = true;
-                int[] mv = move[NEXT_MOVE];
+                int[] mv = move;
                 if (moveDir > 0) {
                     if (movePos >= mv.length) {
                         movePos = 0;
@@ -1284,7 +1297,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 animationMode = AnimationMode.STOPPED;
                 LogUtil.d(TAG, "animateCube: repaint at end of loop", isDebuggable);
                 repaint();
-                notifyAnimationFinishedHandler();
+                notifyHandlerAnimationFinished();
             } while (!interrupted);
             animThreadInactive = true;
         }
@@ -1365,7 +1378,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         twisting = false;
         natural = true;
         twistLayers(cube, layer, num, mode);
-        notifyListenerCubeUpdated();
+        notifyHandlerCubeModelUpdated();
         LogUtil.e(TAG, "Updated Cube Model -> twistLayers in spin", isDebuggable);
         spinning = false;
         if (animated) {
@@ -1375,23 +1388,29 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
         }
     }
 
-    private void notifyListenerCubeUpdated() {
+    private void notifyHandlerCubeModelUpdated() {
+        mainThreadHandler.sendEmptyMessage(NOTIFY_LISTENER_MODEL_UPDATED);
+    }
+
+    private void notifyListenerCubeUpdatedOnMainThread() {
         int[][] cubeCopy = new int[6][9];
-        CubeUtils.deepCopy2DArray(cube, cubeCopy);
-        if (onCubeModelUpdatedListener != null) {
-            onCubeModelUpdatedListener.onCubeModelUpdate(cubeCopy);
+        synchronized (animThreadLock) {
+            CubeUtils.deepCopy2DArray(cube, cubeCopy);
+        }
+        if (cubeModelUpdatedListener != null) {
+            cubeModelUpdatedListener.onCubeModelUpdate(cubeCopy);
         }
     }
 
-    private void notifyAnimationFinishedHandler() {
+    private void notifyHandlerAnimationFinished() {
         if (mainThreadHandler != null) {
             mainThreadHandler.sendEmptyMessage(NOTIFY_LISTENER_ANIMATION_FINISHED);
         }
     }
 
     private void notifyListenerAnimationFinishedOnMainThread() {
-        if (onCubeAnimationFinishedListener != null) {
-            onCubeAnimationFinishedListener.onAnimationFinished();
+        if (cubeAnimationFinishedListener != null) {
+            cubeAnimationFinishedListener.onAnimationFinished();
         }
     }
 
@@ -1733,7 +1752,8 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener,
                 originalAngle = 0;
                 natural = true; // the cube in the natural state
                 twistLayers(cube, twistedLayer, num, twistedMode); // rotate the facelets
-                notifyListenerCubeUpdated();
+                //handlePointerUpEvent is always called from the main thread, so we can notify the listener directly, instead of going through the handler
+                notifyListenerCubeUpdatedOnMainThread();
                 LogUtil.e(TAG, "Updated Cube Model -> twistLayers in handlePointerUpEvent", isDebuggable);
             }
             repaint();
