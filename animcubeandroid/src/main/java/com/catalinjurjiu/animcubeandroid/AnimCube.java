@@ -228,23 +228,17 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
 
     public AnimCube(Context context) {
         super(context);
-        init(context, null, -1, -1);
+        init(context, null);
     }
 
     public AnimCube(Context context, AttributeSet attrs) {
         super(context, attrs);
-        init(context, attrs, -1, -1);
+        init(context, attrs);
     }
 
     public AnimCube(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        init(context, attrs, defStyleAttr, -1);
-    }
-
-    @SuppressWarnings("NewApi")
-    public AnimCube(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
-        super(context, attrs, defStyleAttr, defStyleRes);
-        init(context, attrs, defStyleAttr, defStyleRes);
+        init(context, attrs);
     }
 
     /**
@@ -263,28 +257,6 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         synchronized (animThreadLock) {
             return cube;
         }
-    }
-
-    /**
-     * <p>
-     * Sets the cube in the specified state. This method expects an {@code int[6][9]} array(i.e. 6 faces, 9 facelets on each face).
-     * </p>
-     * <p>
-     * The array needs to be populated with integers specified in {@link CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
-     * order in which faces are specified is not relevant, since {@link AnimCube} doesn't care about the cube model that much. The specified model doesn't even have to be a
-     * valid Rubik's cube.
-     * </p>
-     * <p>
-     * <b>Note:</b> after this is set {@link #resetToInitialState()} will reset the cube to the state set here, not to the cube state previous to calling {@link #setCubeModel(String)}.
-     * </p>
-     *
-     * @param colorValues an {@code int[6][9]} array with color values from {@link CubeColors}
-     */
-    public void setCubeModel(int[][] colorValues) {
-        CubeUtils.deepCopy2DArray(colorValues, cube);
-        CubeUtils.deepCopy2DArray(colorValues, initialCube);
-        notifyHandlerAnimationFinished();
-        repaint();
     }
 
     /**
@@ -313,6 +285,28 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         if (wasValid) {
             notifyHandlerCubeModelUpdated();
         }
+        repaint();
+    }
+
+    /**
+     * <p>
+     * Sets the cube in the specified state. This method expects an {@code int[6][9]} array(i.e. 6 faces, 9 facelets on each face).
+     * </p>
+     * <p>
+     * The array needs to be populated with integers specified in {@link CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
+     * order in which faces are specified is not relevant, since {@link AnimCube} doesn't care about the cube model that much. The specified model doesn't even have to be a
+     * valid Rubik's cube.
+     * </p>
+     * <p>
+     * <b>Note:</b> after this is set {@link #resetToInitialState()} will reset the cube to the state set here, not to the cube state previous to calling {@link #setCubeModel(String)}.
+     * </p>
+     *
+     * @param colorValues an {@code int[6][9]} array with color values from {@link CubeColors}
+     */
+    public void setCubeModel(int[][] colorValues) {
+        CubeUtils.deepCopy2DArray(colorValues, cube);
+        CubeUtils.deepCopy2DArray(colorValues, initialCube);
+        notifyHandlerAnimationFinished();
         repaint();
     }
 
@@ -803,7 +797,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
         }
     }
 
-    private void init(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
+    private void init(Context context, AttributeSet attrs) {
         TypedArray attributes = context.obtainStyledAttributes(attrs,
                 R.styleable.AnimCube);
 
