@@ -23,7 +23,6 @@ public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdate
         Log.d(TAG, "onCreate");
         setContentView(R.layout.activity_main);
         animCube = (AnimCube) findViewById(R.id.animcube);
-        animCube.setMoveSequence("R2' U M U' R2' U M' U'");
         animCube.setOnCubeModelUpdatedListener(this);
         animCube.setOnAnimationFinishedListener(this);
     }

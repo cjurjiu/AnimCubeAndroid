@@ -1347,7 +1347,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
             }
         }
 
-        LogUtil.w(TAG, "stopAnimationAndDrawing BEFORE requestShutdown.", isDebuggable);
+        LogUtil.w(TAG, "stopAnimationAndDrawing DONE.", isDebuggable);
     }
 
     private void sleep(int time) {
