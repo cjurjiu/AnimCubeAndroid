@@ -37,10 +37,13 @@ public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdate
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.start_moves:
+            case R.id.play_forward:
                 animCube.startAnimation(CubeConstants.AnimationMode.AUTO_PLAY_FORWARD);
                 break;
-            case R.id.stop_moves:
+            case R.id.play_backward:
+                animCube.startAnimation(CubeConstants.AnimationMode.AUTO_PLAY_BACKWARD);
+                break;
+            case R.id.stop:
                 animCube.stopAnimation();
                 break;
             case R.id.one_move_forward:
@@ -49,7 +52,7 @@ public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdate
             case R.id.one_move_backward:
                 animCube.startAnimation(CubeConstants.AnimationMode.STEP_BACKWARD);
                 break;
-            case R.id.reset_to_initial:
+            case R.id.reset:
                 animCube.resetToInitialState();
                 break;
             case R.id.save_state:

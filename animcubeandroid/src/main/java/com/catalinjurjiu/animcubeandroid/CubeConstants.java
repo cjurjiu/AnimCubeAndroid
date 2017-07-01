@@ -4,12 +4,23 @@ import android.support.annotation.IntDef;
 import android.support.annotation.StringDef;
 
 /**
- * Contains the constants form the cube solver, 3D solution display and from the RubikCube, RubikFace classes
+ * Contains various constants used by the cube when rendering, and when setting certain properties.
  */
 public class CubeConstants {
 
+    /**
+     * <p>
+     * String representing the initial cube rotation.
+     * </p>
+     */
     public static final String DEFAULT_INITIAL_CUBE_ROTATION = "lluu";
 
+    /**
+     * <p>
+     * Contains the 3 possible vertical alignment values: TOP,CENTER,BOTTOM.
+     * </p>
+     * <p>These are only available to set through XML, and only make sense if the cube scale is also modified s.t. it won't fill the whole possible space.</p>
+     */
     @StringDef
     public @interface CubeAlign {
         String TOP = "top";
@@ -17,19 +28,68 @@ public class CubeConstants {
         String BOTTOM = "bottom";
     }
 
+    /**
+     * <p>Contains the animation modes available to the cube. To be used with {@link AnimCube#startAnimation(int)}</p>
+     *
+     * @see AnimCube#startAnimation(int)
+     */
     @IntDef
     public @interface AnimationMode {
-        int STOPPED = -1, // STOPPED
-                AUTO_PLAY_FORWARD = 0, // play forward
-                AUTO_PLAY_BACKWARD = 1, // play backward
-                STEP_FORWARD = 2, // step forward
-                STEP_BACKWARD = 3, // step backward
-                AUTO_FAST_FORWARD = 4, // fast forward to end
-                AUTO_FAST_BACKWARD = 5,  // fast backward to start
-                STEP_FAST_FORWARD = 6, // fast forward one move
-                STEP_FAST_BACKWARD = 7;  // fast backward one move
+        /**
+         * <p>
+         * The cube is not animating. It's only used internally by the cube and has no effect when passed to {@link AnimCube#startAnimation(int)}.
+         * </p>
+         */
+        int STOPPED = -1,
+        /**
+         * <p>
+         * Animates the currently set move sequence one move at a time. When a move has completed, the next one is automatically started.
+         * </p>
+         * <p>The animation stops when the last move in the move sequence is reached and animated.</p>
+         */
+        AUTO_PLAY_FORWARD = 0,
+        /**
+         * <p>
+         * Animates the currently set move sequence one move at a time, <i>in reverse</i> (i.e. from end to start with opposite twisting direction). When a move has completed, the next one is automatically started.
+         * </p>
+         * <p>The animation stops when the first move in the move sequence is reached and animated.</p>
+         */
+        AUTO_PLAY_BACKWARD = 1, // play backward
+        /**
+         * <p>
+         * Animates <i>only</i> the next move from the move sequence. When it has completed, the next one is <b>not</b> automatically started.
+         * </p>
+         */
+        STEP_FORWARD = 2, // step forward
+        /**
+         * <p>
+         * Animates in reverse (i.e. with opposite twisting direction) <i>only</i> the previous move from the move sequence. When it has completed, the next one is <b>not</b> automatically started.
+         * </p>
+         */
+        STEP_BACKWARD = 3, // step backward
+        /**
+         * <p>Instantly applies the whole move sequence on the cube, without animation.</p>
+         */
+        AUTO_FAST_FORWARD = 4, // fast forward to end
+        /**
+         * <p>Instantly applies the whole move sequence in reverse, on the cube, without animation.</p>
+         */
+        AUTO_FAST_BACKWARD = 5,  // fast backward to start
+        /**
+         * <p>Instantly applies the next move on the cube, without animation.</p>
+         */
+        STEP_FAST_FORWARD = 6, // fast forward one move
+        /**
+         * <p>Instantly applies the previous move on reverse, on the cube, without animation.</p>
+         */
+        STEP_FAST_BACKWARD = 7;  // fast backward one move
     }
 
+    /**
+     * <p>
+     * Defines constants that match the default cube colors.
+     * </p>
+     */
     @IntDef
     public @interface CubeColors {
         int WHITE = 0,
@@ -38,9 +98,13 @@ public class CubeConstants {
                 RED = 3,
                 BLUE = 4,
                 GREEN = 5;
-
     }
 
+    /**
+     * <p>
+     * Contains the keys used to store various state information when {@link AnimCube#saveState()} is called.
+     * </p>
+     */
     @StringDef
     public @interface CubeState {
         String KEY_CUBE = "AnimCubeState::cube",

@@ -2,12 +2,16 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/start_moves"
-        android:title="Start moves"
+        android:id="@+id/play_forward"
+        android:title="Play"
         app:showAsAction="never"/>
     <item
-        android:id="@+id/stop_moves"
-        android:title="Stop moves"
+        android:id="@+id/play_backward"
+        android:title="Play backward"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/stop"
+        android:title="Stop"
         app:showAsAction="never"/>
     <item
         android:id="@+id/one_move_forward"
@@ -18,12 +22,8 @@
         android:title="1 Move Backward"
         app:showAsAction="never"/>
     <item
-        android:id="@+id/reset_to_initial"
-        android:title="Reset to initial"
-        app:showAsAction="never"/>
-    <item
-        android:id="@+id/freeze"
-        android:title="Freeze"
+        android:id="@+id/reset"
+        android:title="Reset"
         app:showAsAction="never"/>
     <item
         android:id="@+id/save_state"

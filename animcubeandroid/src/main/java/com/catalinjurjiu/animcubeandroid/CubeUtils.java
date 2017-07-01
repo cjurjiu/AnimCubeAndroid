@@ -4,6 +4,7 @@ import android.graphics.Color;
 import android.support.annotation.ColorInt;
 
 /**
+ * Various utils used primarily when rendering the cube (with few exceptions).
  * Created by catalin on 05.06.2017.
  */
 class CubeUtils {

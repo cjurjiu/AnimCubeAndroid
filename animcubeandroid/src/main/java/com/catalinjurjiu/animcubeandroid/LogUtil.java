@@ -3,9 +3,11 @@ package com.catalinjurjiu.animcubeandroid;
 import android.util.Log;
 
 /**
+ * <p>
+ * Wrapper methods to several methods from {@link Log}, that only print to logcat if we need them to.
+ * </p>
  * Created by catalin on 19.06.2017.
  */
-
 class LogUtil {
 
     private LogUtil() {
