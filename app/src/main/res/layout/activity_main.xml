@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.catalinjujiu.testrubikrenderer.MainActivity">
+    tools:context="com.catalinjurjiu.demoanimcubeandroid.MainActivity">
 
     <com.catalinjurjiu.animcubeandroid.AnimCube
         android:id="@+id/animcube"

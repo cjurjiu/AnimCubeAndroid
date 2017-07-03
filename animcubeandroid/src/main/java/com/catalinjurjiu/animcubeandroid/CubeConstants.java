@@ -3,9 +3,13 @@ package com.catalinjurjiu.animcubeandroid;
 import android.support.annotation.IntDef;
 import android.support.annotation.StringDef;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+
 /**
  * Contains various constants used by the cube when rendering, and when setting certain properties.
  */
+@SuppressWarnings("unused")
 public class CubeConstants {
 
     /**
@@ -22,6 +26,7 @@ public class CubeConstants {
      * <p>These are only available to set through XML, and only make sense if the cube scale is also modified s.t. it won't fill the whole possible space.</p>
      */
     @StringDef
+    @Retention(RetentionPolicy.SOURCE)
     public @interface CubeAlign {
         String TOP = "top";
         String CENTER = "center";
@@ -34,6 +39,7 @@ public class CubeConstants {
      * @see AnimCube#startAnimation(int)
      */
     @IntDef
+    @Retention(RetentionPolicy.SOURCE)
     public @interface AnimationMode {
         /**
          * <p>
@@ -91,6 +97,7 @@ public class CubeConstants {
      * </p>
      */
     @IntDef
+    @Retention(RetentionPolicy.SOURCE)
     public @interface CubeColors {
         int WHITE = 0,
                 YELLOW = 1,
@@ -106,6 +113,7 @@ public class CubeConstants {
      * </p>
      */
     @StringDef
+    @Retention(RetentionPolicy.SOURCE)
     public @interface CubeState {
         String KEY_CUBE = "AnimCubeState::cube",
                 KEY_INITIAL_CUBE = "AnimCubeState::initialCube",

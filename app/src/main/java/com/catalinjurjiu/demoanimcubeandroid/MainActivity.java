@@ -1,4 +1,4 @@
-package com.catalinjujiu.testrubikrenderer;
+package com.catalinjurjiu.demoanimcubeandroid;
 
 import android.app.Activity;
 import android.os.Bundle;
