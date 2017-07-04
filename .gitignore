@@ -9,3 +9,4 @@
 **/build
 /captures
 .externalNativeBuild
+**/upload_to_bintray.gradle
