@@ -13,6 +13,7 @@ android {
     }
     signingConfigs {
         defaultConfig {
+            //use debug keystore on all build variants, in order to be able to test release builds
             storeFile file("/home/catalin/.android/debug.keystore")
             storePassword "android"
             keyAlias "androiddebugkey"

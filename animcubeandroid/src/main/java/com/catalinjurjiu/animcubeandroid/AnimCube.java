@@ -1,5 +1,7 @@
 package com.catalinjurjiu.animcubeandroid;
 
+import android.app.Activity;
+import android.app.Fragment;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
@@ -62,8 +64,41 @@ import static com.catalinjurjiu.animcubeandroid.CubeUtils.vProd;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.vScale;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.vSub;
 
+/**
+ * <p>
+ * View capable of displaying a 3D Rubik's Cube, with support for interaction through touch gestures and for animating a sequence of moves.
+ * </p>
+ * <p>
+ * To animate a sequence of moves, use {@link AnimCube#startAnimation(int)}. The supported animation modes are defined in {@link AnimationMode}.
+ * </p>
+ * <p>
+ * User interaction through touch gestures is enabled by default but can be customized though {@link #setEditable(boolean)}.
+ * </p>
+ * <p>
+ * Additionally, this object is able to notify interested parties when the cube's data model is changed, or when a certain animation (started with {@link #startAnimation(int)}) has finished.
+ * </p>
+ * <p>Changes to the cube's model can occur in two cases:
+ * <ul>
+ * <li>when a sequence of moves is animated, the cube model is changed with every move;</li>
+ * <li>when the cube is editable and the user rotates a face manually.</li>
+ * </ul>
+ * To be notified by such changes, an {@link OnCubeModelUpdatedListener} can be set.
+ * </p>
+ * <p>
+ * In order to be notified when an animation is finished, use an {@link OnCubeAnimationFinishedListener}.
+ * </p>
+ * <h2>
+ * Important:
+ * </h2>
+ * <p>
+ * This view is a subclass of {@link SurfaceView} and performs the animations on a dedicated thread. In order to ensure that the resources held by this object
+ * are released gracefully, always call {@link #cleanUpResources()} when this view's parent is destroyed.
+ * <br>
+ * Good places to call this are {@link Activity#onDestroy()} & {@link Fragment#onDestroyView()}.
+ * </p>
+ */
 @SuppressWarnings("unused")
-public final class AnimCube extends SurfaceView implements View.OnTouchListener {
+public class AnimCube extends SurfaceView implements View.OnTouchListener {
     public static final String TAG = "AnimCube";
     private static final int NOTIFY_LISTENER_ANIMATION_FINISHED = 4242;
     private static final int NOTIFY_LISTENER_MODEL_UPDATED = 2424;
@@ -314,7 +349,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
     }
 
     /**
-     * Enables or disables individual face rotation through user touch event.
+     * Enables or disables individual face rotation through user touch event. If this is disabled, touch interactions will always turn the whole cube, not individual faces.
      *
      * @param isEditable {@code true} if the user should be able to edit the cube, {@code false} otherwise
      */
@@ -735,7 +770,7 @@ public final class AnimCube extends SurfaceView implements View.OnTouchListener 
 
     /**
      * <p>
-     * Stops drawing and cleans up the held by this instance. Make sure to call when this instance is discarded, to prevent memory leaks.
+     * Stops drawing and cleans up the resources held by this instance. Make sure to call when this instance is discarded, to prevent memory leaks.
      * </p>
      */
     public void cleanUpResources() {

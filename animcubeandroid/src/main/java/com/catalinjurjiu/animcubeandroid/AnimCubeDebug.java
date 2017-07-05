@@ -1,5 +1,7 @@
 package com.catalinjurjiu.animcubeandroid;
 
+import android.app.Activity;
+import android.app.Fragment;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
@@ -62,8 +64,41 @@ import static com.catalinjurjiu.animcubeandroid.CubeUtils.vProd;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.vScale;
 import static com.catalinjurjiu.animcubeandroid.CubeUtils.vSub;
 
+/**
+ * <p>
+ * View capable of displaying a 3D Rubik's Cube, with support for interaction through touch gestures and for animating a sequence of moves.
+ * </p>
+ * <p>
+ * To animate a sequence of moves, use {@link AnimCube#startAnimation(int)}. The supported animation modes are defined in {@link AnimationMode}.
+ * </p>
+ * <p>
+ * User interaction through touch gestures is enabled by default but can be customized though {@link #setEditable(boolean)}.
+ * </p>
+ * <p>
+ * Additionally, this object is able to notify interested parties when the cube's data model is changed, or when a certain animation (started with {@link #startAnimation(int)}) has finished.
+ * </p>
+ * <p>Changes to the cube's model can occur in two cases:
+ * <ul>
+ * <li>when a sequence of moves is animated, the cube model is changed with every move;</li>
+ * <li>when the cube is editable and the user rotates a face manually.</li>
+ * </ul>
+ * To be notified by such changes, an {@link AnimCube.OnCubeModelUpdatedListener} can be set.
+ * </p>
+ * <p>
+ * In order to be notified when an animation is finished, use an {@link AnimCube.OnCubeAnimationFinishedListener}.
+ * </p>
+ * <h2>
+ * Important:
+ * </h2>
+ * <p>
+ * This view is a subclass of {@link SurfaceView} and performs the animations on a dedicated thread. In order to ensure that the resources held by this object
+ * are released gracefully, always call {@link #cleanUpResources()} when this view's parent is destroyed.
+ * <br>
+ * Good places to call this are {@link Activity#onDestroy()} & {@link Fragment#onDestroyView()}.
+ * </p>
+ */
 @SuppressWarnings("unused")
-public final class AnimCubeDebug extends SurfaceView implements View.OnTouchListener {
+public class AnimCubeDebug extends SurfaceView implements View.OnTouchListener {
     public static final String TAG = "AnimCube";
     private static final int NOTIFY_LISTENER_ANIMATION_FINISHED = 4242;
     private static final int NOTIFY_LISTENER_MODEL_UPDATED = 2424;
@@ -260,6 +295,28 @@ public final class AnimCubeDebug extends SurfaceView implements View.OnTouchList
 
     /**
      * <p>
+     * Sets the cube in the specified state. This method expects an {@code int[6][9]} array(i.e. 6 faces, 9 facelets on each face).
+     * </p>
+     * <p>
+     * The array needs to be populated with integers specified in {@link CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
+     * order in which faces are specified is not relevant, since {@link AnimCubeDebug} doesn't care about the cube model that much. The specified model doesn't even have to be a
+     * valid Rubik's cube.
+     * </p>
+     * <p>
+     * <b>Note:</b> after this is set {@link #resetToInitialState()} will reset the cube to the state set here, not to the cube state previous to calling {@link #setCubeModel(String)}.
+     * </p>
+     *
+     * @param colorValues an {@code int[6][9]} array with color values from {@link CubeColors}
+     */
+    public void setCubeModel(int[][] colorValues) {
+        CubeUtils.deepCopy2DArray(colorValues, cube);
+        CubeUtils.deepCopy2DArray(colorValues, initialCube);
+        notifyHandlerAnimationFinished();
+        repaint();
+    }
+
+    /**
+     * <p>
      * Sets the cube in the specified state. This method expects a {@link String} with exactly 54 characters (i.e. 9 facelets on each cube face * 6 cube faces). If the string
      * is of different length, nothing will happen.
      * </p>
@@ -284,28 +341,6 @@ public final class AnimCubeDebug extends SurfaceView implements View.OnTouchList
         if (wasValid) {
             notifyHandlerCubeModelUpdated();
         }
-        repaint();
-    }
-
-    /**
-     * <p>
-     * Sets the cube in the specified state. This method expects an {@code int[6][9]} array(i.e. 6 faces, 9 facelets on each face).
-     * </p>
-     * <p>
-     * The array needs to be populated with integers specified in {@link CubeColors}. Each integer specifies the color of one cube facelet. Additionally, the
-     * order in which faces are specified is not relevant, since {@link AnimCubeDebug} doesn't care about the cube model that much. The specified model doesn't even have to be a
-     * valid Rubik's cube.
-     * </p>
-     * <p>
-     * <b>Note:</b> after this is set {@link #resetToInitialState()} will reset the cube to the state set here, not to the cube state previous to calling {@link #setCubeModel(String)}.
-     * </p>
-     *
-     * @param colorValues an {@code int[6][9]} array with color values from {@link CubeColors}
-     */
-    public void setCubeModel(int[][] colorValues) {
-        CubeUtils.deepCopy2DArray(colorValues, cube);
-        CubeUtils.deepCopy2DArray(colorValues, initialCube);
-        notifyHandlerAnimationFinished();
         repaint();
     }
 
