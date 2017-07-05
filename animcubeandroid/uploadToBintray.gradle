@@ -10,7 +10,7 @@ publishing {
             artifact javadocJar
             groupId 'com.catalinjurjiu'
             artifactId 'animcube-android'
-            version '1.0.0'
+            version '1.0.1'
 
             //The publication doesn't know about our dependencies, so we have to manually add them to the pom
             pom.withXml {
@@ -30,10 +30,9 @@ publishing {
 
 Properties properties = new Properties()
 properties.load(project.rootProject.file('local.properties').newDataInputStream())
-
 bintray {
-    user = properties.hasProperty('bintrayUser') ? properties.property('bintrayUser') : System.getenv('BINTRAY_USER')
-    key = properties.hasProperty('bintrayApiKey') ? properties.property('bintrayApiKey') : System.getenv('BINTRAY_API_KEY')
+    user = properties.getProperty('bintrayUser')
+    key = properties.getProperty('bintrayApiKey')
     publications = ['Publication']
     pkg {
         repo = 'cjurjiu-opensource'
@@ -42,8 +41,8 @@ bintray {
         publicDownloadNumbers = true
         override = true
         version {
-            name = '1.0.0'
-            desc = 'AnimCube for Android v1.'
+            name = '1.0.1'
+            desc = 'AnimCube for Android v1.0.1'
             released = new Date()
             licenses = ['Apache-2.0']
             vcsUrl = 'https://github.com/cjurjiu/animcubeandroid.git'
