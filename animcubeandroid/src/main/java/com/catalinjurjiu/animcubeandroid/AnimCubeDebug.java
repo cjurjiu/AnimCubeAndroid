@@ -69,13 +69,15 @@ import static com.catalinjurjiu.animcubeandroid.CubeUtils.vSub;
  * View capable of displaying a 3D Rubik's Cube, with support for interaction through touch gestures and for animating a sequence of moves.
  * </p>
  * <p>
- * To animate a sequence of moves, use {@link AnimCube#startAnimation(int)}. The supported animation modes are defined in {@link AnimationMode}.
+ * To animate a sequence of moves, the following methods are available: {@link #animateMoveSequence()}, {@link #animateMoveSequenceReversed()}, {@link #animateMove()}
+ * and {@link #animateMoveReversed()}. Applying moves without animation is also possible, through one of: {@link #applyMoveSequence()}, {@link #applyMoveSequenceReversed()},
+ * {@link #applyMove()} and {@link #applyMoveReversed()}.
  * </p>
  * <p>
  * User interaction through touch gestures is enabled by default but can be customized though {@link #setEditable(boolean)}.
  * </p>
  * <p>
- * Additionally, this object is able to notify interested parties when the cube's data model is changed, or when a certain animation (started with {@link #startAnimation(int)}) has finished.
+ * Additionally, this object is able to notify interested parties when the cube's data model is changed, or when a certain animation has finished.
  * </p>
  * <p>Changes to the cube's model can occur in two cases:
  * <ul>
@@ -85,7 +87,7 @@ import static com.catalinjurjiu.animcubeandroid.CubeUtils.vSub;
  * To be notified by such changes, an {@link AnimCube.OnCubeModelUpdatedListener} can be set.
  * </p>
  * <p>
- * In order to be notified when an animation is finished, use an {@link AnimCube.OnCubeAnimationFinishedListener}.
+ * In order to be notified when an animation is finished or when a certain move has been applied instantly, use an {@link AnimCube.OnCubeAnimationFinishedListener}.
  * </p>
  * <h2>
  * Important:
@@ -205,8 +207,8 @@ public class AnimCubeDebug extends SurfaceView implements View.OnTouchListener {
     private float touchSensitivityCoefficient;
     private int animationMode = AnimationMode.STOPPED;
     private int backFacesDistance;
-    private OnCubeModelUpdatedListener cubeModelUpdatedListener;
-    private OnCubeAnimationFinishedListener cubeAnimationFinishedListener;
+    private AnimCube.OnCubeModelUpdatedListener cubeModelUpdatedListener;
+    private AnimCube.OnCubeAnimationFinishedListener cubeAnimationFinishedListener;
     private boolean isDebuggable;
     private Handler mainThreadHandler = new Handler(Looper.getMainLooper()) {
         @Override
@@ -561,73 +563,69 @@ public class AnimCubeDebug extends SurfaceView implements View.OnTouchListener {
 
     /**
      * <p>
-     * Begins performing the moves specified through {@link #setMoveSequence(String)}.
+     * Animates all the moves in the currently set move sequence one move at a time. When a move has completed, the next one is automatically started.
      * </p>
-     * <p>
-     * Supports several <i>animation modes</i>, specified through values from {@link AnimationMode}.
-     * </p>
-     *
-     * @param mode a values from {@link AnimationMode} indicating the desires animation mode.
-     * @see AnimationMode
+     * <p>The animation stops when the last move in the move sequence is reached and animated.</p>
      */
-    public void startAnimation(int mode) {
-        LogUtil.e(TAG, "startAnimation. mode:" + mode, isDebuggable);
-        synchronized (animThreadLock) {
-            LogUtil.e(TAG, "startAnimation. acquired lock", isDebuggable);
-            stopAnimation();
-            if (move.length == 0) {
-                return;
-            }
-            switch (mode) {
-                case AnimationMode.AUTO_PLAY_FORWARD: // play forward
-                    moveDir = 1;
-                    moveOne = false;
-                    moveAnimated = true;
-                    break;
-                case AnimationMode.AUTO_PLAY_BACKWARD: // play backward
-                    moveDir = -1;
-                    moveOne = false;
-                    moveAnimated = true;
-                    break;
-                case AnimationMode.STEP_FORWARD: // step forward
-                    moveDir = 1;
-                    moveOne = true;
-                    moveAnimated = true;
-                    break;
-                case AnimationMode.STEP_BACKWARD: // step backward
-                    moveDir = -1;
-                    moveOne = true;
-                    moveAnimated = true;
-                    break;
-                case AnimationMode.AUTO_FAST_FORWARD: // fast forward
-                    moveDir = 1;
-                    moveOne = false;
-                    moveAnimated = false;
-                    break;
-                case AnimationMode.AUTO_FAST_BACKWARD: // fast forward
-                    moveDir = -1;
-                    moveOne = false;
-                    moveAnimated = false;
-                    break;
-                case AnimationMode.STEP_FAST_FORWARD: // step one fast forward
-                    moveDir = 1;
-                    moveOne = true;
-                    moveAnimated = false;
-                    break;
-                case AnimationMode.STEP_FAST_BACKWARD: // step one fast backward
-                    moveDir = -1;
-                    moveOne = true;
-                    moveAnimated = false;
-                    break;
-                default:
-                    LogUtil.w(TAG, "Unknown animation mode:" + mode + ". Nothing performed.", isDebuggable);
-                    return;
-            }
-            animationMode = mode;
-            LogUtil.e(TAG, "startAnimation: notify", isDebuggable);
-            animThreadLock.notify();
-            LogUtil.e(TAG, "startAnimation: end of sync block", isDebuggable);
-        }
+    public void animateMoveSequence() {
+        startAnimation(AnimationMode.AUTO_PLAY_FORWARD);
+    }
+
+    /**
+     * <p>
+     * Animates all the moves in the currently set move sequence one move at a time, <i>in reverse</i> (i.e. from end to start with opposite twisting direction). When a move has
+     * completed, the next one is automatically started.
+     * </p>
+     * <p>The animation stops when the first move in the move sequence is reached and animated.</p>
+     */
+    public void animateMoveSequenceReversed() {
+        startAnimation(AnimationMode.AUTO_PLAY_BACKWARD);
+    }
+
+    /**
+     * <p>
+     * Animates <i>only</i> the next move from the move sequence. When it has completed, the next one is <b>not</b> automatically started.
+     * </p>
+     */
+    public void animateMove() {
+        startAnimation(AnimationMode.STEP_FORWARD);
+    }
+
+    /**
+     * <p>
+     * Animates in reverse (i.e. with opposite twisting direction) <i>only</i> the previous move from the move sequence. When it has completed, the next one is <b>not</b> automatically started.
+     * </p>
+     */
+    public void animateMoveReversed() {
+        startAnimation(AnimationMode.STEP_BACKWARD);
+    }
+
+    /**
+     * <p>Instantly applies the whole move sequence on the cube, without animation.</p>
+     */
+    public void applyMoveSequence() {
+        startAnimation(AnimationMode.AUTO_FAST_FORWARD);
+    }
+
+    /**
+     * <p>Instantly applies the whole move sequence in reverse, on the cube, without animation.</p>
+     */
+    public void applyMoveSequenceReversed() {
+        startAnimation(AnimationMode.AUTO_FAST_BACKWARD);
+    }
+
+    /**
+     * <p>Instantly applies the next move on the cube, without animation.</p>
+     */
+    public void applyMove() {
+        startAnimation(AnimationMode.STEP_FAST_FORWARD);
+    }
+
+    /**
+     * <p>Instantly applies the previous move on reverse, on the cube, without animation.</p>
+     */
+    public void applyMoveReversed() {
+        startAnimation(AnimationMode.STEP_FAST_BACKWARD);
     }
 
     /**
@@ -664,7 +662,7 @@ public class AnimCubeDebug extends SurfaceView implements View.OnTouchListener {
      *
      * @param onCubeModelUpdatedListener the listener interested in cube model updates
      */
-    public void setOnCubeModelUpdatedListener(OnCubeModelUpdatedListener onCubeModelUpdatedListener) {
+    public void setOnCubeModelUpdatedListener(AnimCube.OnCubeModelUpdatedListener onCubeModelUpdatedListener) {
         synchronized (animThreadLock) {
             if (onCubeModelUpdatedListener == null) {
                 //listener removed, shutdown handler
@@ -681,7 +679,7 @@ public class AnimCubeDebug extends SurfaceView implements View.OnTouchListener {
      *
      * @param onCubeAnimationFinishedListener the listener interested being notified when the cube animation completes.
      */
-    public void setOnAnimationFinishedListener(OnCubeAnimationFinishedListener onCubeAnimationFinishedListener) {
+    public void setOnAnimationFinishedListener(AnimCube.OnCubeAnimationFinishedListener onCubeAnimationFinishedListener) {
         synchronized (animThreadLock) {
             if (onCubeAnimationFinishedListener == null) {
                 //listener removed, shutdown handler
@@ -986,6 +984,77 @@ public class AnimCubeDebug extends SurfaceView implements View.OnTouchListener {
 
     private void initDoubleRotationSpeed(TypedArray attributes) {
         this.doubleSpeed = attributes.getInt(R.styleable.AnimCube_double_rotation_speed, this.speed * 3 / 2);
+    }
+
+    /**
+     * <p>
+     * Begins performing the moves specified through {@link #setMoveSequence(String)}.
+     * </p>
+     * <p>
+     * Supports several <i>animation modes</i>, specified through values from {@link AnimationMode}.
+     * </p>
+     *
+     * @param mode a values from {@link AnimationMode} indicating the desires animation mode.
+     * @see AnimationMode
+     */
+    private void startAnimation(int mode) {
+        LogUtil.e(TAG, "startAnimation. mode:" + mode, isDebuggable);
+        synchronized (animThreadLock) {
+            LogUtil.e(TAG, "startAnimation. acquired lock", isDebuggable);
+            stopAnimation();
+            if (move.length == 0) {
+                return;
+            }
+            switch (mode) {
+                case AnimationMode.AUTO_PLAY_FORWARD: // play forward
+                    moveDir = 1;
+                    moveOne = false;
+                    moveAnimated = true;
+                    break;
+                case AnimationMode.AUTO_PLAY_BACKWARD: // play backward
+                    moveDir = -1;
+                    moveOne = false;
+                    moveAnimated = true;
+                    break;
+                case AnimationMode.STEP_FORWARD: // step forward
+                    moveDir = 1;
+                    moveOne = true;
+                    moveAnimated = true;
+                    break;
+                case AnimationMode.STEP_BACKWARD: // step backward
+                    moveDir = -1;
+                    moveOne = true;
+                    moveAnimated = true;
+                    break;
+                case AnimationMode.AUTO_FAST_FORWARD: // fast forward
+                    moveDir = 1;
+                    moveOne = false;
+                    moveAnimated = false;
+                    break;
+                case AnimationMode.AUTO_FAST_BACKWARD: // fast forward
+                    moveDir = -1;
+                    moveOne = false;
+                    moveAnimated = false;
+                    break;
+                case AnimationMode.STEP_FAST_FORWARD: // step one fast forward
+                    moveDir = 1;
+                    moveOne = true;
+                    moveAnimated = false;
+                    break;
+                case AnimationMode.STEP_FAST_BACKWARD: // step one fast backward
+                    moveDir = -1;
+                    moveOne = true;
+                    moveAnimated = false;
+                    break;
+                default:
+                    LogUtil.w(TAG, "Unknown animation mode:" + mode + ". Nothing performed.", isDebuggable);
+                    return;
+            }
+            animationMode = mode;
+            LogUtil.e(TAG, "startAnimation: notify", isDebuggable);
+            animThreadLock.notify();
+            LogUtil.e(TAG, "startAnimation: end of sync block", isDebuggable);
+        }
     }
 
     private void performDraw(Canvas canvas) {
@@ -1872,58 +1941,5 @@ public class AnimCubeDebug extends SurfaceView implements View.OnTouchListener {
             currentAngle = 0.03 * (dragX * dx + dragY * dy) / Math.sqrt(dragX * dragX + dragY * dragY); // dv * cos a
         }
         repaint();
-    }
-
-    /**
-     * <p>
-     * Interface definition for a callback to be invoked when the cube model has changed.
-     * </p>
-     */
-    public interface OnCubeModelUpdatedListener {
-        /**
-         * <p>
-         * Invoked when the cube model has been updated. See {@link #getCubeModel()} to understand how to interpret the cube model.
-         * </p>
-         * <p>
-         * This is called when:
-         * <ul>
-         * <li>the cube model is updated after an animation</li>
-         * <li>the cube model is updated because the user rotated a side, through a touch event</li>
-         * <li>{@link #setCubeModel(String)} (or its overload) are called</li>
-         * <li>when {@link #resetToInitialState()} is called</li>
-         * <li>when {@link #stopAnimation()} is called, as it sets the cube in the state it would have been, if the animation would have completed.</li>
-         * </ul>
-         * </p>
-         * <p>
-         * This is <b>not called</b> when the cube's state is restored after the app resumes from background, or after a configuration change.
-         * </p>
-         * <p>
-         * The array representing the new cube model is a deep copy of its actual model, hence, safe to modify.
-         * </p>
-         *
-         * @param newCubeModel an int array (i.e. <code>int[6][9]</code>) representing the cube's updated model.
-         * @see #getCubeModel()
-         * @see #setCubeModel(String)
-         * @see #setCubeModel(int[][])
-         */
-        void onCubeModelUpdate(int[][] newCubeModel);
-    }
-
-    /**
-     * <p>
-     * Interface definition for a callback to be invoked when the cube has finished animating a move.
-     * </p>
-     */
-    public interface OnCubeAnimationFinishedListener {
-        /**
-         * <p>
-         * Invoked when the cube has finished an animation previously started with {@link #startAnimation(int)}.
-         * </p>
-         * <p>
-         * When {@link #startAnimation(int)} is called with a {@link AnimationMode} that performs several spins (e.g. {@link AnimationMode#AUTO_PLAY_FORWARD}, then
-         * this callback will only be called when all the moves in the sequence have been performed, and not at the end of each spin.
-         * </p>
-         */
-        void onAnimationFinished();
     }
 }

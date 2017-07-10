@@ -34,13 +34,54 @@ public class CubeConstants {
     }
 
     /**
+     * <p>
+     * Defines constants that match the default cube colors.
+     * </p>
+     */
+    @IntDef
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface CubeColors {
+        int WHITE = 0,
+                YELLOW = 1,
+                ORANGE = 2,
+                RED = 3,
+                BLUE = 4,
+                GREEN = 5;
+    }
+
+    /**
+     * <p>
+     * Contains the keys used to store various state information when {@link AnimCube#saveState()} is called.
+     * </p>
+     */
+    @StringDef
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface CubeState {
+        String KEY_CUBE = "AnimCubeState::cube",
+                KEY_INITIAL_CUBE = "AnimCubeState::initialCube",
+                KEY_MOVE = "AnimCubeState::move",
+                KEY_MOVE_POS = "AnimCubeState::movePos",
+                KEY_EYE = "AnimCubeState::eye",
+                KEY_EYE_X = "AnimCubeState::eyeX",
+                KEY_EYE_Y = "AnimCubeState::eyeY",
+                KEY_IS_ANIMATING = "AnimCubeState::isAnimating",
+                KEY_ANIMATION_MODE = "AnimCubeState::animationMode",
+                KEY_ORIGINAL_ANGLE = "AnimCubeState::originalAngle",
+                KEY_EDITABLE = "AnimCubeState::editable",
+                KEY_BACKFACES_DISTANCE = "AnimCubeState::backfacesDistance",
+                KEY_SINGLE_ROTATION_SPEED = "AnimCubeState::singleRotationSpeed",
+                KEY_DOUBLE_ROTATION_SPEED = "AnimCubeState::doubleRotationSpeed",
+                KEY_IS_DEBUGGABLE = "AnimCubeState::isDebuggable";
+    }
+
+    /**
      * <p>Contains the animation modes available to the cube. To be used with {@link AnimCube#startAnimation(int)}</p>
      *
      * @see AnimCube#startAnimation(int)
      */
     @IntDef
     @Retention(RetentionPolicy.SOURCE)
-    public @interface AnimationMode {
+    @interface AnimationMode {
         /**
          * <p>
          * The cube is not animating. It's only used internally by the cube and has no effect when passed to {@link AnimCube#startAnimation(int)}.
@@ -89,47 +130,6 @@ public class CubeConstants {
          * <p>Instantly applies the previous move on reverse, on the cube, without animation.</p>
          */
         STEP_FAST_BACKWARD = 7;  // fast backward one move
-    }
-
-    /**
-     * <p>
-     * Defines constants that match the default cube colors.
-     * </p>
-     */
-    @IntDef
-    @Retention(RetentionPolicy.SOURCE)
-    public @interface CubeColors {
-        int WHITE = 0,
-                YELLOW = 1,
-                ORANGE = 2,
-                RED = 3,
-                BLUE = 4,
-                GREEN = 5;
-    }
-
-    /**
-     * <p>
-     * Contains the keys used to store various state information when {@link AnimCube#saveState()} is called.
-     * </p>
-     */
-    @StringDef
-    @Retention(RetentionPolicy.SOURCE)
-    public @interface CubeState {
-        String KEY_CUBE = "AnimCubeState::cube",
-                KEY_INITIAL_CUBE = "AnimCubeState::initialCube",
-                KEY_MOVE = "AnimCubeState::move",
-                KEY_MOVE_POS = "AnimCubeState::movePos",
-                KEY_EYE = "AnimCubeState::eye",
-                KEY_EYE_X = "AnimCubeState::eyeX",
-                KEY_EYE_Y = "AnimCubeState::eyeY",
-                KEY_IS_ANIMATING = "AnimCubeState::isAnimating",
-                KEY_ANIMATION_MODE = "AnimCubeState::animationMode",
-                KEY_ORIGINAL_ANGLE = "AnimCubeState::originalAngle",
-                KEY_EDITABLE = "AnimCubeState::editable",
-                KEY_BACKFACES_DISTANCE = "AnimCubeState::backfacesDistance",
-                KEY_SINGLE_ROTATION_SPEED = "AnimCubeState::singleRotationSpeed",
-                KEY_DOUBLE_ROTATION_SPEED = "AnimCubeState::doubleRotationSpeed",
-                KEY_IS_DEBUGGABLE = "AnimCubeState::isDebuggable";
     }
 
     static class ComputationLogic {

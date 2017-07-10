@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:cube="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -11,11 +11,11 @@
         android:id="@+id/animcube"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:backFacesDistance="4"
-        app:backgroundColor="#d0d0d0"
-        app:debuggable="true"
-        app:editable="true"
-        app:moves="R2' U M U' R2' U M' U'"
-        app:single_rotation_speed="30"/>
+        cube:backFacesDistance="4"
+        cube:backgroundColor="#d0d0d0"
+        cube:debuggable="true"
+        cube:editable="true"
+        cube:moves="R2' U M U' R2' U M' U'"
+        cube:single_rotation_speed="30"/>
 
 </FrameLayout>

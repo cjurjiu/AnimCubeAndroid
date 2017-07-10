@@ -8,7 +8,6 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 
 import com.catalinjurjiu.animcubeandroid.AnimCube;
-import com.catalinjurjiu.animcubeandroid.CubeConstants;
 
 public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdatedListener, AnimCube.OnCubeAnimationFinishedListener {
 
@@ -38,19 +37,19 @@ public class MainActivity extends Activity implements AnimCube.OnCubeModelUpdate
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.play_forward:
-                animCube.startAnimation(CubeConstants.AnimationMode.AUTO_PLAY_FORWARD);
+                animCube.animateMoveSequence();
                 break;
             case R.id.play_backward:
-                animCube.startAnimation(CubeConstants.AnimationMode.AUTO_PLAY_BACKWARD);
+                animCube.animateMoveSequenceReversed();
                 break;
             case R.id.stop:
                 animCube.stopAnimation();
                 break;
             case R.id.one_move_forward:
-                animCube.startAnimation(CubeConstants.AnimationMode.STEP_FORWARD);
+                animCube.animateMove();
                 break;
             case R.id.one_move_backward:
-                animCube.startAnimation(CubeConstants.AnimationMode.STEP_BACKWARD);
+                animCube.animateMoveReversed();
                 break;
             case R.id.reset:
                 animCube.resetToInitialState();
