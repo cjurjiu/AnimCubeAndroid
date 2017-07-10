@@ -16,6 +16,6 @@
         cube:debuggable="true"
         cube:editable="true"
         cube:moves="R2' U M U' R2' U M' U'"
-        cube:single_rotation_speed="30"/>
+        cube:singleRotationSpeed="30"/>
 
 </FrameLayout>

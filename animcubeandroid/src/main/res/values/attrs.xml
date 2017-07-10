@@ -12,9 +12,9 @@
         <attr name="initialRotation" format="string|reference"/>
         <attr name="perspective" format="integer|reference"/>
         <attr name="scale" format="integer|reference"/>
-        <attr name="single_rotation_speed" format="integer|reference"/>
-        <attr name="double_rotation_speed" format="integer|reference"/>
         <attr name="verticalAlign" format="string|reference"/>
+        <attr name="singleRotationSpeed" format="integer|reference"/>
+        <attr name="doubleRotationSpeed" format="integer|reference"/>
         <attr name="debuggable" format="boolean|reference"/>
     </declare-styleable>
 </resources>

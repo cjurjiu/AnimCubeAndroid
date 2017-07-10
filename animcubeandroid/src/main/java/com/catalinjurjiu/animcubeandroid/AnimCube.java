@@ -965,11 +965,11 @@ public class AnimCube extends SurfaceView implements View.OnTouchListener {
     }
 
     private void initSingleRotationSpeed(TypedArray attributes) {
-        this.speed = attributes.getInt(R.styleable.AnimCube_single_rotation_speed, 5);
+        this.speed = attributes.getInt(R.styleable.AnimCube_singleRotationSpeed, 5);
     }
 
     private void initDoubleRotationSpeed(TypedArray attributes) {
-        this.doubleSpeed = attributes.getInt(R.styleable.AnimCube_double_rotation_speed, this.speed * 3 / 2);
+        this.doubleSpeed = attributes.getInt(R.styleable.AnimCube_doubleRotationSpeed, this.speed * 3 / 2);
     }
 
     /**

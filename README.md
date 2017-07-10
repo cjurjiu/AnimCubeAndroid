@@ -206,8 +206,8 @@ Parameters list:
   * [initialRotation](#initialRotation)
   * [perspective](#perspective)
   * [scale](#scale)
-  * [single_rotation_speed](#single_rotation_speed)
-  * [double_rotation_speed](#double_rotation_speed)
+  * [singleRotationSpeed](#singleRotationSpeed)
+  * [doubleRotationSpeed](#doubleRotationSpeed)
   * [verticalAlign](#verticalAlign)
   * [debuggable](#debuggable)
 
@@ -331,15 +331,15 @@ The default value is 0 that causes the cube to fit in window.
 
 The parameter is useful in combination with *verticalAlign*.
 
-### <a name="single_rotation_speed"></a> single_rotation_speed - integer | reference
+### <a name="singleRotationSpeed"></a> singleRotationSpeed - integer | reference
 
 Sets the rotation speed of a single rotation. This parameter allows to customize the speed of quarter turn separately from face turns. The value should consist only of decimal digits.
 
 The higher value the slower is the animation. The default value is 10, which corresponds to approximately 1 second for face turn and approximately 2/3 seconds for quarter turn if not specified differently.
 
-The face turn speed can be adjusted separately by *double_rotation_speed*.
+The face turn speed can be adjusted separately by *doubleRotationSpeed*.
 
-### <a name="double_rotation_speed"></a> double_rotation_speed - integer | reference
+### <a name="doubleRotationSpeed"></a> doubleRotationSpeed - integer | reference
 
 Sets the rotation speed of a double rotation. This parameter allows to customize the speed of face turns separately from quarter turns. The value should consist only of decimal digits.
 
@@ -348,7 +348,7 @@ for the face turn.
 
 The default is set to the 150% of the value of speed.
 
-The quarter turn speed can be adjusted by *single_rotation_speed*.
+The quarter turn speed can be adjusted by *singleRotationSpeed*.
 
 ### <a name="verticalAlign"></a> verticalAlign - integer | reference
 
