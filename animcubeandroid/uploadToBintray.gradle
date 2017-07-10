@@ -10,7 +10,7 @@ publishing {
             artifact javadocJar
             groupId 'com.catalinjurjiu'
             artifactId 'animcube-android'
-            version '1.0.2'
+            version '1.0.3'
 
             //The publication doesn't know about our dependencies, so we have to manually add them to the pom
             pom.withXml {
@@ -41,8 +41,8 @@ bintray {
         publicDownloadNumbers = true
         override = true
         version {
-            name = '1.0.2'
-            desc = 'AnimCube for Android v1.0.2'
+            name = '1.0.3'
+            desc = 'AnimCube for Android v1.0.3'
             released = new Date()
             licenses = ['Apache-2.0']
             vcsUrl = 'https://github.com/cjurjiu/animcubeandroid.git'

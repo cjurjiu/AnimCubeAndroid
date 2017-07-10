@@ -1,4 +1,4 @@
-# AnimCube for Android [ ![Download](https://api.bintray.com/packages/cjurjiu/cjurjiu-opensource/animcube-android/images/download.svg?version=1.0.2) ](https://bintray.com/cjurjiu/cjurjiu-opensource/animcube-android/1.0.2/link) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://tldrlegal.com/license/apache-license-2.0-(apache-2.0))
+# AnimCube for Android [ ![Download](https://api.bintray.com/packages/cjurjiu/cjurjiu-opensource/animcube-android/images/download.svg) ](https://bintray.com/cjurjiu/cjurjiu-opensource/animcube-android/_latestVersion) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://tldrlegal.com/license/apache-license-2.0-(apache-2.0))
 An Android port (with added features) of [Josef Jelinek's AnimCube](http://software.rubikscube.info/AnimCube) Java Web applet.
 
 Animating moves towards a solution | Touch interactions
@@ -374,7 +374,7 @@ Binaries and dependency information for Maven, Ivy, Gradle and others can be fou
 Example for Gradle:
 
 ```groovy
-compile 'com.catalinjurjiu:animcube-android:1.0.2'
+compile 'com.catalinjurjiu:animcube-android:1.0.3'
 ```
 
 and for Maven:
@@ -383,14 +383,14 @@ and for Maven:
 <dependency>
   <groupId>com.catalinjurjiu</groupId>
   <artifactId>animcube-android</artifactId>
-  <version>1.0.2</version>
+  <version>1.0.3</version>
   <type>pom</type>
 </dependency>
 ```
 and for Ivy:
 
 ```xml
-<dependency org='com.catalinjurjiu' name='animcube-android' rev='1.0.2'>
+<dependency org='com.catalinjurjiu' name='animcube-android' rev='1.0.3'>
   <artifact name='animcube-android' ext='pom' ></artifact>
 </dependency>
 ```
