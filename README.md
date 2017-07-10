@@ -1,5 +1,5 @@
 # AnimCube for Android [ ![Download](https://api.bintray.com/packages/cjurjiu/cjurjiu-opensource/animcube-android/images/download.svg?version=1.0.2) ](https://bintray.com/cjurjiu/cjurjiu-opensource/animcube-android/1.0.2/link) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://tldrlegal.com/license/apache-license-2.0-(apache-2.0))
-An Android port (with added features) of Josef Jelinek's original AnimCube.
+An Android port (with added features) of [Josef Jelinek's AnimCube](http://software.rubikscube.info/AnimCube) Java Web applet.
 
 Animating moves towards a solution | Touch interactions
 :---: | :---:
@@ -70,19 +70,15 @@ animCube.stopAnimation();
 ```
 As a side effect, `stopAnimation` instantly the applies the move it interrupted.
 
-You can also just apply a move sequence, without animating the moves:
+You can also just apply a move sequence, or an individual move, without an animation:
 
 ```java
 animCube.applyMoveSequence();
-//in reverse
-animCube.applyMoveSequenceReversed();
-```
-Individual moves can also be applied with no animation:
-
-```java
+//individual move
 animCube.applyMove();
-animCube.applyMoveReversed();
 ```
+
+Both `apply` methods also have `reverse` equivalents.
 ## Custom colors
 If the default colors don't play nicely with your theme's color palette, or if you just don't fancy them, custom ones can be specified through XML.
 
@@ -175,7 +171,7 @@ When debug mode is **on**, `AnimCube.java` prints some warnings, if they happen.
 
 On the other hand, `AnimCubeDebug.java` prints a plethora of debug & info messages to LogCat when debug mode is **on**, and prints nothing when it's **off**.
 
-The decission to have two different classes wasn't an easy one. Internally, both classes rely on utility methods to decide whether to print a certain message or not. However, even if in the end logging to logcat doesn't happen, the string message is still allocated. An alternative would've been to check the condition before allocating the string, but then the code itself would be polluted with tons of conditional checks.
+The decision to have two different classes was not an easy one. Internally, both classes rely on utility methods to decide whether to print a certain message or not. However, even if in the end logging to logcat doesn't happen, the string message is still allocated. An alternative would've been to check the condition before allocating the string, but then the code itself would be polluted with tons of conditional checks.
 
 By removing all debug & info logs from `AnimCube.java`, memory is not polluted with strings that never get printed when debug mode is off. Yet, all the debug messages can still be obtained if `AnimCube` is swapped with `AnimCubeDebug` when attempting to reproduce an issue.
 
@@ -193,7 +189,7 @@ By default, debug mode is **disabled**.
 ## Parameters available in XML
 Many of the [original parameters](http://software.rubikscube.info/AnimCube/) have been kept with equivalent behavior. However, certain names were changed. 
 
-This section describes just the configuration params supported by AnimCube-Android, however if you are interested in an actual changelog between the list of parameters provided by the original and this version, see [CHANGELOG_FROM_ANIMCUBE_JELINEK.md](https://github.com/cjurjiu/animcubeandroid)
+This section describes just the configuration params supported by AnimCube-Android, however if you are interested in an actual changelog between the list of parameters provided by the original and this version, see the [Changelog from original AnimCube](./changelog_from_animcube_applet.md).
 
 Parameters list:
   * [backgroundColor](#backgroundColor)
@@ -201,6 +197,7 @@ Parameters list:
   * [faceletContourColor](#faceletContourColor)
   * [initialState](#initialState)
   * [moves](#moves)
+  * [editable](#editable)
   * [backFacesDistance](#backFacesDistance)
   * [touchSensitivity](#touchSensitivity)
   * [initialRotation](#initialRotation)
@@ -297,6 +294,10 @@ If the move sequence string passed to this method has more than one move sequenc
 
 **Note:** For additional details and a few left out alternatives to certain notations, see Josef's complete documentation for the move sequence <a href="http://software.rubikscube.info/AnimCube/#move">here.</a>
 
+### <a name="editable"></a> editable - boolean | reference
+
+If *enabled*, allows the user to modify the cube model through touch events, by rotating faces. If *disabled*, drag events will always rotate the whole cube.  
+
 ### <a name="backFacesDistance"></a> backFacesDistance - integer | reference
 
 Controls whether sides pointing away from the user are rendered behind the cube. This parameter sets their distance from the cube. 
@@ -331,6 +332,16 @@ The default value is 0 that causes the cube to fit in window.
 
 The parameter is useful in combination with *verticalAlign*.
 
+### <a name="verticalAlign"></a> verticalAlign - integer | reference
+
+This parameter allows to position the cube vertically. 
+
+The only permitted values are *"top"*, *"center"* and *"bottom"* for bottom align. 
+
+The default value is 1.
+
+**Note:** The parameter makes sense in combination with scale. With the default scale, the cube will always be centered.
+
 ### <a name="singleRotationSpeed"></a> singleRotationSpeed - integer | reference
 
 Sets the rotation speed of a single rotation. This parameter allows to customize the speed of quarter turn separately from face turns. The value should consist only of decimal digits.
@@ -349,16 +360,6 @@ for the face turn.
 The default is set to the 150% of the value of speed.
 
 The quarter turn speed can be adjusted by *singleRotationSpeed*.
-
-### <a name="verticalAlign"></a> verticalAlign - integer | reference
-
-This parameter allows to position the cube vertically. 
-
-The only permitted values are *"top"*, *"center"* and *"bottom"* for bottom align. 
-
-The default value is 1.
-
-**Note:** The parameter makes sense in combination with scale. With the default scale, the cube will always be centered.
 
 ### <a name="debuggable"></a> debuggable - boolean | reference
 
