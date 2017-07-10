@@ -1,20 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <array name="test_custom_cube_colors">
-        <item>#000000</item>
-        <item>#ff00c8</item>
-        <item>#20ffbc</item>
-        <item>#d04900</item>
-        <item>#009032</item>
-        <item>#6320d0</item>
-    </array>
-
-    <array name="test_custom_cube_colors2">
+    <array name="custom_cube_colors">
         <item>#ce3232</item>
-        <item>#d764be</item>
-        <item>#b9bed6</item>
-        <item>#d9ff00</item>
-        <item>#00290b</item>
-        <item>#090778</item>
+        <item>#ffa239</item>
+        <item>#737581</item>
+        <item>#e7dc00</item>
+        <item>#01641c</item>
+        <item>#141291</item>
     </array>
 </resources>
