@@ -181,6 +181,34 @@ To turn debug mode on from code, use `AnimCube#setDebuggable(boolean)`. To enabl
 
 By default, debug mode is **disabled**.
 
+## Binaries
+
+Binaries and dependency information for Maven, Ivy, Gradle and others can be found on [jcenter](https://bintray.com/cjurjiu/cjurjiu-opensource/animcube-android).
+
+Example for Gradle:
+
+```groovy
+compile 'com.catalinjurjiu:animcube-android:1.0.2'
+```
+
+and for Maven:
+
+```xml
+<dependency>
+  <groupId>com.catalinjurjiu</groupId>
+  <artifactId>animcube-android</artifactId>
+  <version>1.0.2</version>
+  <type>pom</type>
+</dependency>
+```
+and for Ivy:
+
+```xml
+<dependency org='com.catalinjurjiu' name='animcube-android' rev='1.0.2'>
+  <artifact name='animcube-android' ext='pom' ></artifact>
+</dependency>
+```
+
 ## Parameters available in XML
 Many of the [original parameters](http://software.rubikscube.info/AnimCube/) have been kept with equivalent behavior. However, certain names were changed. 
 
